@@ -1,0 +1,512 @@
+# arima model with no external regressors
+f_no_xreg = forecast(auto.arima(page_views_ts),
+h = horizon)$mean
+#  with playoff games played
+f_playoff_played = forecast(auto.arima(page_views_ts,
+xreg = train_df$playoff_games_played),
+h = horizon, xreg = val_df$playoff_games_played)$mean
+#  with playoff games won
+f_playoff_won = forecast(auto.arima(page_views_ts,
+xreg = train_df$playoff_games_won),
+h = horizon, xreg = val_df$playoff_games_won)$mean
+accuracy_df = data.frame(model = c(rep("No Xreg", horizon),
+rep("Games Played", horizon),
+rep("Games Won", horizon)),
+forecasted_views = c(f_no_xreg,
+f_playoff_played,
+f_playoff_won
+),
+actual_views = rep(val_df$page_views, 3)
+)
+calcMape = function(predicted_amt, actual_amt){
+return(round(mean(abs(predicted_amt - actual_amt)/actual_amt) * 100, 1))
+}
+accuracy_df %>%
+group_by(model) %>%
+do(mape = calcMape(.$forecasted_views,
+.$actual_views
+)) %>%
+mutate(mape = unlist(mape),
+model = factor(model)) %>%
+mutate(model = fct_reorder(model, mape, .desc = FALSE)) %>%
+ggplot(aes(x = model, y = round(mape, 0),
+fill = model, label = as.character(round(mape, 0)))) +
+geom_bar(stat = "identity") +
+theme_bw() +
+my_plot_theme() +
+scale_fill_manual(values = color_values[1:length(unique(accuracy_df$model))]) +
+xlab("Forecasting Inputs") + ylab("MAPE") +
+theme(legend.position = "none") +
+geom_label(label.size = 1, size = 10, color = "white")
+library(rPython)
+python.load("/Users/mlebo1/Desktop/site/content/post/forecasting_with_tom_brady_data/collect_game_data.py")
+library(reticulate)
+blah = py_run_file("/Users/mlebo1/Desktop/site/content/post/forecasting_with_tom_brady_data/collect_game_data.py")
+help("py_run_file")
+libs = c('wikipediatrend', 'dplyr', 'data.table',
+'rvest', 'forecast', 'lubridate',
+'janitor','knitr', 'ggplot2',
+'forcats', 'lazyeval', 'kableExtra', 'readr')
+lapply(libs, require, character.only = TRUE)
+working_directory = "/Users/mlebo1/Desktop/site/content/post/forecasting_with_tom_brady_data"
+setwd(working_directory)
+page_views = read.csv("/Users/mlebo1/Desktop/site/content/post/forecasting_with_tom_brady_data/page_views_clean.csv") %>%
+mutate(date = as.Date(date)) %>%
+mutate(month = month(month)) %>%
+group_by(year, month) %>%
+mutate(max_month_date = max(date),
+page_views = sum(page_views)
+) %>%
+select(year, month, max_month_date, page_views) %>%
+distinct() %>%
+filter(year > 2007 & max_month_date < as.Date("2015-03-01")) %>%
+data.frame()
+script_name = "collect_game_data.py"
+python_location = system("which python", intern = TRUE)
+#exe_command = paste0(python_location, " ", working_directory, )
+python_location
+paste(python_location,
+file.path(working_directory, script_name),
+working_directory
+)
+paste(python_location,
+file.path(working_directory, script_name),
+working_directory,
+sep = " "
+)
+python_location = "//anaconda/bin/python"
+libs = c('wikipediatrend', 'dplyr', 'data.table',
+'rvest', 'forecast', 'lubridate',
+'janitor','knitr', 'ggplot2',
+'forcats', 'lazyeval', 'kableExtra', 'readr')
+lapply(libs, require, character.only = TRUE)
+working_directory = "/Users/mlebo1/Desktop/site/content/post/forecasting_with_tom_brady_data"
+setwd(working_directory)
+page_views = read.csv("/Users/mlebo1/Desktop/site/content/post/forecasting_with_tom_brady_data/page_views_clean.csv") %>%
+mutate(date = as.Date(date)) %>%
+mutate(month = month(month)) %>%
+group_by(year, month) %>%
+mutate(max_month_date = max(date),
+page_views = sum(page_views)
+) %>%
+select(year, month, max_month_date, page_views) %>%
+distinct() %>%
+filter(year > 2007 & max_month_date < as.Date("2015-03-01")) %>%
+data.frame()
+knitr::opts_chunk$set(echo = TRUE)
+python_location = "//anaconda/bin/python"
+libs = c('wikipediatrend', 'dplyr', 'data.table',
+'rvest', 'forecast', 'lubridate',
+'janitor','knitr', 'ggplot2',
+'forcats', 'lazyeval', 'kableExtra', 'readr', 'emo')
+lapply(libs, require, character.only = TRUE)
+working_directory = "/Users/mlebo1/Desktop/site/content/post/forecasting_with_tom_brady_data"
+setwd(working_directory)
+page_views = read.csv("/Users/mlebo1/Desktop/site/content/post/forecasting_with_tom_brady_data/page_views_clean.csv") %>%
+mutate(date = as.Date(date)) %>%
+mutate(month = month(month)) %>%
+group_by(year, month) %>%
+mutate(max_month_date = max(date),
+page_views = sum(page_views)
+) %>%
+select(year, month, max_month_date, page_views) %>%
+distinct() %>%
+filter(year > 2007 & max_month_date < as.Date("2015-03-01")) %>%
+data.frame()
+kable(head(page_views, 15), "html", align = "c") %>%
+kable_styling(bootstrap_options = c("striped",
+"hover"),
+full_width = TRUE) %>%
+scroll_box(width = "720px", height = "400px")
+game_data = read_csv('/Users/mlebo1/Desktop/site/content/post/forecasting_with_tom_brady_data/game_data.csv')
+kable(head(game_data, 15), "html", align = "c") %>%
+kable_styling(bootstrap_options = c("striped",
+"hover"),
+full_width = FALSE) %>%
+scroll_box(width = "720px", height = "400px")
+playoff_data = game_data %>%
+mutate(date = as.Date(as.character(date), format = '%Y%m%d'),
+outcome = ifelse(outcome == "W", 1, 0)) %>%
+mutate(year = year(date),
+month = month(date, label = TRUE),
+week = week(date)) %>%
+mutate(playoff_game = ifelse(month %in% c("Jan", "Feb") & week != 1,
+1,
+0)) %>%
+mutate(playoff_game_win = ifelse(outcome == 1 & playoff_game == 1,
+1,
+0)) %>%
+group_by(year) %>%
+summarise(playoff_games_won = sum(playoff_game_win),
+playoff_games_played = sum(playoff_game))
+kable(tail(playoff_data, 15), "html", align = "c") %>%
+kable_styling(bootstrap_options = c("striped",
+"hover"),
+full_width = TRUE) %>%
+scroll_box(width = "720px", height = "400px")
+page_views = inner_join(page_views,
+playoff_data
+) %>%
+mutate(part = ifelse(year == 2015,
+"test",
+"train"),
+playoff_games_won = ifelse(month %in% c(1, 2),
+playoff_games_won,
+0),
+playoff_games_played = ifelse(month %in% c(1, 2),
+playoff_games_played,
+0))
+my_plot_theme = function(){
+font_family = "Helvetica"
+font_face = "bold"
+return(theme(
+axis.text.x = element_text(size = 18, face = font_face, family = font_family),
+axis.text.y = element_text(size = 18, face = font_face, family = font_family),
+axis.title.x = element_text(size = 20, face = font_face, family = font_family),
+axis.title.y = element_text(size = 20, face = font_face, family = font_family),
+strip.text.y = element_text(size = 18, face = font_face, family = font_family),
+plot.title = element_text(size = 18, face = font_face, family = font_family),
+legend.position = "top",
+legend.title = element_text(size = 16,
+face = font_face,
+family = font_family),
+legend.text = element_text(size = 14,
+face = font_face,
+family = font_family)
+))
+}
+color_values = c("#272822", "#66D9EF","#F92672","#A6E22E", "#A6E22E", "#F92672")
+page_views %>%
+filter(part == 'train') %>%
+mutate(playoff_games_won = as.factor(playoff_games_won)) %>%
+ggplot(aes(x  = max_month_date, y = page_views)) +
+geom_point(aes(color = playoff_games_won), size = 4) +
+geom_line() +
+theme_bw() +
+scale_color_manual(values = color_values[1:3],
+guide = guide_legend(title = "Playoff Games Won")) +
+my_plot_theme() +
+xlab("Date") +
+ylab("Page Views")
+val_df = page_views %>%
+filter(part == 'train') %>%
+mutate(part = ifelse(year == 2014 & month %in% c(1, 2),
+"validation", "train"
+)) %>%
+filter(part == 'validation')
+train_df = page_views %>%
+filter(max_month_date < min(val_df$max_month_date))
+# create our time-series object
+page_views_ts = ts(train_df$page_views,
+frequency = 12,
+start = c(head(train_df, 1)$year,
+head(train_df, 1)$month),
+end = c(tail(train_df, 1)$year,
+tail(train_df, 1)$month)
+)
+# specify forecast horizon
+horizon = 2
+# arima model with no external regressors
+f_no_xreg = forecast(auto.arima(page_views_ts),
+h = horizon)$mean
+#  with playoff games played
+f_playoff_played = forecast(auto.arima(page_views_ts,
+xreg = train_df$playoff_games_played),
+h = horizon, xreg = val_df$playoff_games_played)$mean
+#  with playoff games won
+f_playoff_won = forecast(auto.arima(page_views_ts,
+xreg = train_df$playoff_games_won),
+h = horizon, xreg = val_df$playoff_games_won)$mean
+accuracy_df = data.frame(model = c(rep("No Xreg", horizon),
+rep("Games Played", horizon),
+rep("Games Won", horizon)),
+forecasted_views = c(f_no_xreg,
+f_playoff_played,
+f_playoff_won
+),
+actual_views = rep(val_df$page_views, 3)
+)
+calcMape = function(predicted_amt, actual_amt){
+return(round(mean(abs(predicted_amt - actual_amt)/actual_amt) * 100, 1))
+}
+accuracy_df %>%
+group_by(model) %>%
+do(mape = calcMape(.$forecasted_views,
+.$actual_views
+)) %>%
+mutate(mape = unlist(mape),
+model = factor(model)) %>%
+mutate(model = fct_reorder(model, mape, .desc = FALSE)) %>%
+ggplot(aes(x = model, y = round(mape, 0),
+fill = model, label = as.character(round(mape, 0)))) +
+geom_bar(stat = "identity") +
+theme_bw() +
+my_plot_theme() +
+scale_fill_manual(values = color_values[1:length(unique(accuracy_df$model))]) +
+xlab("Forecasting Inputs") + ylab("MAPE") +
+theme(legend.position = "none") +
+geom_label(label.size = 1, size = 10, color = "white")
+betting_lines = read.csv("historic_betting_lines.csv")
+betting_lines = read.csv("/Users/mlebo1/Desktop/site/content/post/forecasting_with_tom_brady_data/historic_betting_lines.csv")
+kable(betting_lines, "html", align = "c") %>%
+kable_styling(bootstrap_options = c("striped",
+"hover"),
+full_width = FALSE) %>%
+scroll_box(width = "720px", height = "600px")
+kable(betting_lines %>%
+filter(spread <= 0), "html", align = "c") %>%
+kable_styling(bootstrap_options = c("striped",
+"hover"),
+full_width = FALSE) %>%
+scroll_box(width = "720px", height = "600px")
+betting_lines %>%
+filter(spread <= 0) %>%
+mutate(win_pct = substring(as.character(win_pct), 1,
+(nchar(as.character(win_pct)) - 1))) %>%
+mutate(win_pct = as.numeric(win_pct),
+spread = abs(spread)) %>%
+rename(favorite = spread) %>%
+ggplot(aes(x = favorite, y = win_pct)) +
+geom_point(alpha = 0) +
+geom_line(alpha = 0) +
+stat_smooth(span = 2.0, se = FALSE, size = 2, colour = color_values[1]) +
+ylim(50, 110) +
+xlim(0, 27) +
+scale_x_continuous(breaks = seq(0, 25, 5)) +
+scale_y_continuous(breaks = seq(50, 110, 5)) +
+theme_bw() +
+my_plot_theme() +
+xlab("Point Favorite") + ylab("Chance of Winning") +
+geom_vline(xintercept = 7, size = 2, colour = color_values[2]) +
+geom_vline(xintercept = 5, size = 2, colour = color_values[3]) +
+geom_vline(xintercept = 3, size = 2, colour = color_values[4]) +
+annotate("rect", xmin = 18, xmax = 19, ymin = 88, ymax = 90, fill = color_values[2]) +
+annotate("text", label = "Game 1 Spread", x = 23, y = 89, size = 8, color = color_values[2]) +
+annotate("rect", xmin = 18, xmax = 19, ymin = 85, ymax = 87, fill = color_values[3]) +
+annotate("text", label = "Game 2 Spread", x = 23, y = 86, size = 8, color = color_values[3]) +
+annotate("rect", xmin = 18, xmax = 19, ymin = 82, ymax = 84, fill = color_values[4]) +
+annotate("text", label = "Game 3 Spread", x = 23, y = 83, size = 8, color = color_values[4])
+betting_lines %>%
+filter(spread <= 0) %>%
+mutate(win_pct = substring(as.character(win_pct), 1,
+(nchar(as.character(win_pct)) - 1))) %>%
+mutate(win_pct = as.numeric(win_pct),
+spread = abs(spread)) %>%
+rename(favorite = spread) %>%
+ggplot(aes(x = favorite, y = win_pct)) +
+geom_point(alpha = 0) +
+geom_line(alpha = 0) +
+stat_smooth(span = 2.0, se = FALSE, size = 2, colour = color_values[1]) +
+ylim(50, 110) +
+xlim(0, 27) +
+scale_x_continuous(breaks = seq(0, 25, 5)) +
+scale_y_continuous(breaks = seq(50, 110, 5)) +
+theme_bw() +
+my_plot_theme() +
+xlab("Point Favorite") + ylab("Chance of Winning") +
+geom_vline(xintercept = 7, size = 2, colour = color_values[2]) +
+geom_vline(xintercept = 5, size = 2, colour = color_values[3]) +
+geom_vline(xintercept = 3, size = 2, colour = color_values[4]) +
+annotate("rect", xmin = 18, xmax = 19, ymin = 88, ymax = 90, fill = color_values[2]) +
+annotate("text", label = "Game 1 Spread", x = 23, y = 89, size = 8, color = color_values[2]) +
+annotate("rect", xmin = 18, xmax = 19, ymin = 85, ymax = 87, fill = color_values[3]) +
+annotate("text", label = "Game 2 Spread", x = 23, y = 86, size = 8, color = color_values[3]) +
+annotate("rect", xmin = 18, xmax = 19, ymin = 82, ymax = 84, fill = color_values[4]) +
+annotate("text", label = "Game 3 Spread", x = 23, y = 83, size = 8, color = color_values[4])
+page_views %>%
+filter(part == 'test)
+page_views %>%
+filter(part == 'test)
+head(page_views)
+page_views %>%
+filter(part == 'test')
+page_views %>%
+filter(part == 'test') %>%
+pull(page_views)
+f_playoff_won
+calc_mape = function(predicted_amt, actual_amt){
+return(round(mean(abs(predicted_amt - actual_amt)/actual_amt) * 100, 1))
+}
+f_playoff_won
+calc_mape(f_playoff_won, actual_views)
+actual_views = page_views %>%
+filter(part == 'test') %>%
+pull(page_views)
+calc_mape(f_playoff_won, actual_views)
+print(paste0("MAPE FOR JAN AND FEB:" , calc_mape(f_playoff_won, actual_views), "%"))
+print(paste0("MAPE IS: " , calc_mape(f_playoff_won, actual_views), "%"))
+head(page_views)
+auto.arima(ts(page_views %>%
+fitler(part == 'train') %>%
+pull(page_views),
+frequency = 12),
+xreg = page_views %>%
+filter(part == 'train') %>%
+pull(playoff_games_won)
+)
+auto.arima(ts(page_views %>%
+filter(part == 'train') %>%
+pull(page_views),
+frequency = 12),
+xreg = page_views %>%
+filter(part == 'train') %>%
+pull(playoff_games_won)
+)
+input_ts = ts(page_views %>%
+filter(part == 'train') %>%
+pull(page_views),
+frequency = 12
+)
+xreg = page_views %>%
+filter(part == 'train') %>%
+pull(playoff_games_won)
+model_fit = auto.arima(input_ts, xreg)
+xreg
+input_ts
+input_ts = ts(page_views %>%
+filter(part == 'train') %>%
+pull(page_views),
+frequency = 12
+)
+xreg = page_views %>%
+filter(part == 'train') %>%
+pull(playoff_games_won)
+model_fit = auto.arima(input_ts, xreg = xreg)
+test_xreg = c(2, 2)
+forecasted_views = auto.arima(model_fit,
+h = 2,
+xreg = test_xreg)$mean
+test_xreg = c(2, 2)
+forecasted_views = auto.arima(model_fit,
+h = 2,
+xreg = test_xreg)
+model_fit
+xreg_train = page_views %>%
+filter(part == 'train') %>%
+pull(playoff_games_won)
+model_fit = auto.arima(input_ts, xreg = xreg_train)
+model_fit
+forecasted_views = auto.arima(model_fit,
+h = 2,
+xreg = test_xreg)
+forecasted_views = forecast(model_fit,
+h = 2,
+xreg = test_xreg)
+forecasted_views = forecast(model_fit,
+h = 2,
+xreg = test_xreg)$mean
+print(paste0("MAPE IS: " , calc_mape(forecasted_views, actual_views), "%"))
+actual_views = page_views %>%
+filter(part == 'test') %>%
+pull(page_views)
+input_ts = ts(page_views %>%
+filter(part == 'train') %>%
+pull(page_views),
+frequency = 12
+)
+xreg_train = page_views %>%
+filter(part == 'train') %>%
+pull(playoff_games_won)
+model_fit = auto.arima(input_ts, xreg = xreg_train)
+# prediction for how many playoff games we think the Patriots will win
+test_xreg = c(2, 2)
+forecasted_views = forecast(model_fit,
+h = 2,
+xreg = test_xreg)$mean
+print(paste0("MAPE IS: " , calc_mape(forecasted_views, actual_views), "%"))
+test_xreg = c(3, 3)
+forecasted_views = forecast(model_fit,
+h = 2,
+xreg = test_xreg)$mean
+print(paste0("MAPE IS: " , calc_mape(forecasted_views, actual_views), "%"))
+actual_views = page_views %>%
+filter(part == 'test') %>%
+pull(page_views)
+input_ts = ts(page_views %>%
+filter(part == 'train') %>%
+pull(page_views),
+frequency = 12
+)
+xreg_train = page_views %>%
+filter(part == 'train') %>%
+pull(playoff_games_won)
+model_fit = auto.arima(input_ts, xreg = xreg_train)
+# prediction for how many playoff games we think the Patriots will win
+test_xreg = c(2, 2)
+forecasted_views = forecast(model_fit,
+h = 2,
+xreg = test_xreg)$mean
+print(paste0("MAPE IS: " , calc_mape(forecasted_views, actual_views), "%"))
+summary(model_fit)
+kable(head(page_views, 15), "html", align = "c") %>%
+kable_styling(bootstrap_options = c("striped",
+"hover"),
+full_width = TRUE) %>%
+scroll_box(width = "720px", height = "400px")
+python_location = "//anaconda/bin/python"
+libs = c('wikipediatrend', 'dplyr', 'data.table',
+'rvest', 'forecast', 'lubridate',
+'janitor','knitr', 'ggplot2',
+'forcats', 'lazyeval', 'kableExtra', 'readr', 'emo')
+lapply(libs, require, character.only = TRUE)
+working_directory = "/Users/mlebo1/Desktop/site/content/post/forecasting_with_tom_brady_data"
+setwd(working_directory)
+page_views = read.csv("/Users/mlebo1/Desktop/site/content/post/forecasting_with_tom_brady_data/page_views_clean.csv") %>%
+mutate(date = as.Date(date)) %>%
+mutate(month = month(month)) %>%
+group_by(year, month) %>%
+mutate(max_month_date = max(date),
+page_views = sum(page_views)
+) %>%
+select(year, month, max_month_date, page_views) %>%
+distinct() %>%
+filter(year > 2007 & max_month_date < as.Date("2015-03-01")) %>%
+data.frame()
+kable(head(page_views, 15), "html", align = "c") %>%
+kable_styling(bootstrap_options = c("striped",
+"hover"),
+full_width = TRUE) %>%
+scroll_box(width = "720px", height = "400px")
+knitr::opts_chunk$set(echo = TRUE)
+libs = c('data.table','forecast','lubridate',
+'forcats','dplyr', 'ggforce', 'ggplot2',
+'reshape', 'artyfarty', 'knitr')
+lapply(libs, require, character.only = TRUE)
+data_source = 'https://open-enernoc-data.s3.amazonaws.com/anon/csv/832.csv'
+df = fread(data_source) %>%
+data.frame()
+df = df %>%
+select(-anomaly, -timestamp) %>%
+dplyr::rename(date_time = dttm_utc) %>%
+mutate(date_only = date(date_time),
+month = lubridate::month(date_time, label = TRUE),
+week = as.factor(week(date_time)),
+hour = hour(date_time),
+day = day(date_time))
+df_hourly = df %>%
+group_by(date_only, month, hour) %>%
+summarise(value = mean(value)) %>%
+data.frame() %>%
+mutate(hour = ifelse(nchar(as.character(hour)) == 1, paste0("0", as.character(hour)),
+hour)) %>%
+mutate(hour = paste(hour, "00", "00", sep = ":")) %>%
+mutate(date_time = lubridate::ymd_hms(paste(date_only, hour))) %>%
+select(date_time, month, value) %>%
+mutate(week = as.factor(week(date_time)),
+day = day(date_time),
+hour = hour(date_time)
+)
+head(df_hourly)
+poop = df_hourly$value
+poop
+24 * 7
+poop = ts(df_hourly$value, frequency = 168)
+my_fit = auto.arima(poop)
+blogdown::serve_site()
+setwd('/Users/mlebo1/Desktop/Site')
+blogdown::serve_site()
+blogdown::serve_site()
+servr::daemon_stop("4562367904")
+servr::daemon_stop("4562367904")
+blogdown::serve_site()
+servr::daemon_stop("4352281024")

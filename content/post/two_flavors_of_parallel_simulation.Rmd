@@ -1,0 +1,294 @@
+---
+title: "Two Flavors of Parallel Simulation"
+author: "Mark LeBoeuf"
+date: '2017-09-01T21:13:14-05:00'
+summary: Tired of waiting around for your simulations to finish? Run them in parallel! This post covers how to use Spark and ForEach to add parallelism to your R code.
+tags: ["Spark", "R", "Parallel Processing", "Power"]
+categories: ["Spark", "R", "Parallel Processing", "Power"]
+---
+
+```{r, echo=FALSE, out.height="800px", out.width="800px"}
+knitr::include_graphics("/Users/mlebo1/Desktop/site/content/post/images/two_flavors.jpg")
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+### Overview
+
+In a prior [post](https://thecodeforest.github.io/post/monte_carlo_power_mixed_effects), we discussed how to use Monte Carlo simulation for power analysis. We kept the total number of iterations relatively low to illustrate the process. However, the real value of simulation emerges with many iterations, because the more iterations you run the better idea you get about the thing you are trying to estimate (see [Law of Large Numbers](https://en.wikipedia.org/wiki/Law_of_large_numbers)). In the case of estimating the power of an experiment, the more simulated experiments we run the closer we’ll get to the true probability of committing a *Type II Error*. Simulating the experimental paradigm sequentially is fine but it takes a long time when you increase the number of simulations to 10K or 100K. Any time you come across a task that involves repeated sampling from a distribution – **think parallel**. The results of one simulation do not feed into or depend on the results of another. Thus we can run many simulated experiments at the same time. This is a common theme of any task that is parallelizable, which might be one of the most challenging words to say. In this post, I’m going to discuss two separate ways to implement a power analysis simulation in R. And although we’ll focus only on parallelism (yes, apparently parallelism *is* a word) in the context of experimental power, the workflow discussed here can be generalized to almost any task that involves repeated sampling.
+
+### Parallel Simulations with Foreach
+
+Before starting let's get a high-level understanding of the analytical dataset. Researchers conducted a study examining the impact of continued sleep deprivation (defined as receiving only three hours of sleep per night) on reaction time. The study ran for nine days and the researchers found a significant effect for Number of Days. As you can imagine, participants were a lot slower to react on days eight and nine relative to days zero and one. We want to replicate this effect but don’t have the time to wait nine days for a result. Our question, then, is whether we could still detect an effect of sleep deprivation after only three days. The goal is to achieve at least 80% power, which means that if we replicated the experiment 10 times under the exact same conditions, we would find a significant effect (p < 0.05) in at least eight experiments.
+
+We’ll use the findings from the prior study over the first three days as our base data set. The process will be modeled with a mixed effects model with a random intercept for each participant. Our fixed effect – the thing we are interested in – is days of sleep deprivation. Let’s load up our libraries and fit the initial model.
+
+```{r, include=FALSE}
+libs = c('foreach', 'doParallel', 'lme4', 'dplyr', 'broom', 'ggplot2', 'multidplyr', 'knitr', 'janitor')
+lapply(libs, require, character.only = TRUE)
+sleep_df = lme4::sleepstudy %>% 
+           clean_names() %>% 
+           filter(days <= 3)
+
+fit = lmer(reaction ~ days + (1|subject), data = sleep_df)
+confidence_intervals = confint(fit)
+```
+
+```{r, eval=FALSE}
+libs = c('foreach', 'doParallel', 'lme4', 
+         'dplyr', 'broom', 'ggplot2', 'knitr', 'janitor')
+lapply(libs, require, character.only = TRUE)
+sleep_df = lme4::sleepstudy %>% 
+           clean_names() %>% 
+           filter(days <= 3)
+
+fit = lmer(reaction ~ days + (1|subject), data = sleep_df)
+confidence_intervals = confint(fit)
+```
+
+Let's examine the estimate and confidence intervals for the influence days on reaction time. 
+```{r, eval = FALSE}
+print(summary(fit))
+print(confidence_intervals)
+```
+```{r}
+## Linear mixed model fit by REML ['lmerMod']
+## Formula: Reaction ~ Days + (1 | Subject)
+##    Data: sleep_df
+## 
+## REML criterion at convergence: 660.4
+## 
+## Scaled residuals: 
+##      Min       1Q   Median       3Q      Max 
+## -3.14771 -0.50969 -0.08642  0.48985  2.05082 
+## 
+## Random effects:
+##  Groups   Name        Variance Std.Dev.
+##  Subject  (Intercept) 755.7    27.49   
+##  Residual             379.1    19.47   
+## Number of obs: 72, groups:  Subject, 18
+## 
+## Fixed effects:
+##             Estimate Std. Error t value
+## (Intercept)  255.392      7.532   33.91
+## Days           7.989      2.052    3.89
+## 
+## Correlation of Fixed Effects:
+##      (Intr)
+## Days -0.409
+
+##                  2.5 %    97.5 %
+## .sig01       18.702382  39.73719
+## .sigma       16.152095  23.58800
+## (Intercept) 240.429427 270.35528
+## Days          3.931803  12.04555
+```
+
+Our model indicates that after accounting for baseline differences in participant reaction time (i.e., our random intercept), each additional day increases reaction time by about 8 seconds (7.989 to be exact). Our confidence interval for this coefficient indicates a significant effect, as the range does not contain zero. However, the range of our estimate is fairly wide. Let’s determine how this uncertainty affects overall experimental power. We’ll make predictions on our base dataset with the model defined above, and then add noise (defined by our residuals from our initial model fit) to simulate the sampling process.
+```{r}
+model_predictions = predict(fit, sleep_df)
+standard_deviation = sd(fit@resp$y - fit@resp$mu)
+n_simulations = 1000
+```
+
+`for` loops in R are great for small operations but can be slow for larger operations. Enter `foreach`. The syntax is a little bit different from your typical `for` loop. Let’s first see how to implement our power simulation sequentially using `foreach`. Note that this approach is identical to using a regular `for` loop.
+
+```{r, eval=FALSE}
+seq_start_time = Sys.time()
+seq_results = foreach(
+                  i = 1:n_simulations,
+                  .combine = "rbind",
+                  .packages = c("lme4", "broom", "dplyr")) %do% {
+                  #generate residuals
+                  temporary_residuals = rnorm(nrow(sleep_df), 
+                                              mean = 0, 
+                                              sd = standard_deviation)
+                  #create simulated reaction time
+                  sleep_df$simulated_reaction = model_predictions + temporary_residuals
+                  #refit our model on the simulated data
+                  temp_fit = lmer(simulated_reaction ~ days + (1|subject), 
+                                  data = sleep_df)
+                  #return confidence interval for the Days coefficient
+                  tidy(confint(temp_fit)) %>%
+                  dplyr::rename(coefficients = .rownames,
+                  lower_bound = X2.5..,
+                  upper_bound = X97.5..) %>%
+                  dplyr::filter(coefficients == 'days') %>%
+                  dplyr::select(lower_bound, upper_bound)
+}
+
+seq_end_time = Sys.time()
+seq_run_time = seq_end_time - seq_start_time
+print(paste0("TOTAL RUN TIME: ", seq_run_time))
+```
+
+```{r}
+## [1] "TOTAL RUN TIME: 10.4966700077057"
+```
+
+Implementing the power simulation sequentially took about 10 minutes on my computer. Let’s compare that to a parallel implementation. All we have to do is change the `%do%` to  `%dopar%` to shift the execution from sequential to parallel. But first, we’ll have to set up a computing cluster.
+
+```{r}
+# register our cluster
+cl = makeCluster(detectCores())
+registerDoParallel(cl)
+```
+
+Now that we’ve registered our computing cluster, let’s re-run the above code block but replace `%do%` with `%dopar%` and compare the run-time.
+
+```{r, eval = FALSE}
+para_start_time = Sys.time()
+para_results = foreach(
+                 i = 1:n_simulations,
+                 .combine = "rbind",
+                 .packages = c("lme4", "broom", "dplyr")) %dopar% {
+                 # generate residuals
+                 temporary_residuals = rnorm(nrow(sleep_df),
+                                             mean = 0,
+                                             sd = standard_deviation)
+                 #create simulated reaction time
+                 sleep_df$simulated_reaction = model_predictions + temporary_residuals
+                 #refit our model on the simulated data
+                 temp_fit = lmer(simulated_reaction ~ days + (1|subject), 
+                                 data = sleep_df)
+                 #return confidence interval for the Days coefficient
+                 tidy(confint(temp_fit)) %>%
+                 dplyr::rename(coefficients = .rownames,
+                 lower_bound = X2.5..,
+                 upper_bound = X97.5..) %>%
+                 dplyr::filter(coefficients == 'days') %>%
+                 dplyr::select(lower_bound, upper_bound)
+}
+
+para_end_time = Sys.time()
+para_run_time = para_end_time - para_start_time
+print(paste0("TOTAL RUN TIME: ", para_run_time))
+```
+```{r}
+## [1] "TOTAL RUN TIME: 2.09167686700821"
+```
+So that only took 2.09 minutes, which a substantial reduction in runtime! Let’s check and see how our power calculations panned out. Every instance in which we find a zero in our confidence interval for the Days estimate is a type II error.
+
+```{r, eval = FALSE}
+power_results = para_results %>%
+                mutate(row_index = 1:nrow(para_results)) %>%
+                group_by(row_index) %>%
+                do(result = dplyr::between(0, .$lower_bound, .$upper_bound)) %>%
+                mutate(result = as.integer(unlist(result)))
+print(paste0("TOTAL POWER: ", (n_simulations - sum(power_results$result))/nrow(power_results) * 100, "%"))
+```
+```{r}
+## [1] "TOTAL POWER: 98.9%"
+```
+
+If we ran our experiment under these conditions, we’d detect an effect that we know exists in about 99 of every 100 experiments. So it turns out we can reliably detect an effect with only three days instead of running it for all nine, saving us time and money. Let’s move on to the second approach to parallelism with `spark`. 
+
+### Parallel Simulations with Spark
+
+Spark has recently become one the most popular processing engines for data science. It has several APIs for different programming languages, and R has recently been added to growing list of supported languages. The main benefit of Spark is that it allows for the rapid processing and modeling of data at scale (think lots of data). The main drawback, at the moment, is that it does not support all of the built-in R libraries. This is the primary reason why the section on `foreach` loops was included, as you might want to speed up an operation that cannot be accessed in Spark.  
+
+Indeed, in this section,we'll use a seperate library, `nlme`, for mixed-effect modeling. We'll implement the same process described in the previous section, and compare its runtime with `foreach`. Let's get started by setting up a "local" spark instance, which means leveraging all of the compute power available on the machine that's also running our R-script. The real power of Spark is realized in a computing cluster, where the data is spread to and processed by many computers simultaneously. However, we're going to keep it simple and just run everything on a single machine. 
+
+```{r, eval = FALSE}
+library(sparklyr)
+library(nlme)
+## create spark context (sc)
+sc = spark_connect(master = "local")
+```
+
+We can verify that Spark is using all of available cores for computation. 
+```{r, eval = FALSE}
+print(paste0("N Cores in use: ", sc$config$sparklyr.cores.local))
+```
+```{r}
+## [1] "N Cores in use: 8"
+```
+
+Now let's refit the model above and get an estimate of our standard deviation. 
+
+```{r, eval = FALSE}
+fit_nlme = nlme::lme(reaction ~ days, random = ~ 1|subject, sleep_df)
+fit_pred = predict(fit_nlme, sleep_df)
+standard_deviation = sd(sleep_df$reaction - unname(fit_pred))
+```
+
+Next, we'll make 1000 copies of our dataset and bind them together. We’ll also generate all the errors for each of the iterations as well. 
+```{r, eval = FALSE}
+n_sim = 1000
+
+sleep_df_sim = data.frame(sapply(sleep_df, 
+                                  rep.int, 
+                                  times = n_sim))
+residual_i = c()
+for(i in 1:n_sim){
+  residual_i = c(residual_i, 
+                          rnorm(nrow(sleep_df), 
+                                mean = 0, 
+                                sd = standard_deviation))
+}
+
+sleep_df_sim$iteration = rep(1:n_sim, 
+                              each = nrow(sleep_df))
+sleep_df_sim$sim_reaction = residual_i + rep(fit_pred, n_sim)
+```
+
+At this point, each study has 72 observations (18 participants with 4 data points each (days 0 - 3). We created 1000 replications of the study, so our total dataset size is now 72000 rows. Each 72 observation “group” is identified by the  `iteration` field. Thus each core should receive approximately 125 iterations with 72 observations per iteration, for a total of ~9000 observations per core (assuming you are also using eight cores). Rarely is data so perfectly balanced, but this should provide an intuition into what's happening under the hood. Let's first translate our `R DataFrame` into a `Spark DataFrame`. 
+
+```{r, eval = FALSE}
+sleep_tbl = copy_to(sc, 
+                    sleep_df_sim, 
+                    "sleep_df_sim")
+```
+
+Below we'll utilize the `spark_apply` function to implement the power simulation. I frequently use this function in my day-to-day work, as it allows the user to define an arbitrary function and then apply it to the partitioned `Spark DataFrame`. We are partitioning our DataFrame by the `iteration` field. We'll then pull the results back into R with the `collect` verb and calculate the total number of confidence intervals that contain zero, which indicates a Type II Error. 
+
+```{r, eval = FALSE}
+spark_start_time = Sys.time()
+sim_results = spark_apply(sleep_tbl,
+                   function(x) broom::tidy(
+                               nlme::intervals(
+                               nlme::lme(
+                                 sim_reaction ~ days, 
+                                         random = ~ 1|subject, x
+                                        )
+                                              )$fixed
+                                           ),
+                   names = c('.rownames', 
+                             'lower', 
+                             'est.', 
+                             'upper'),
+                   group_by = "iteration"
+)
+
+sim_ci = sim_results %>% 
+         collect() %>% 
+         data.frame() %>% 
+         filter(.rownames == 'days') %>% 
+         select(iteration, lower, upper) %>% 
+         mutate(lower_bound = ifelse(lower < 0, 1, 0),
+                upper_bound = ifelse(upper > 0, 1, 0)) %>% 
+         mutate(type_ii_err = ifelse(lower_bound + upper_bound > 1, 1, 0))
+spark_end_time = Sys.time()
+spark_run_time = spark_end_time - spark_start_time
+print(paste0("TOTAL RUN TIME: ", spark_run_time))
+```
+```{r, eval = FALSE}
+## [1] "TOTAL RUN TIME: 22.3460450172424"
+```
+In this case, Spark is considerably faster than `foreach`, with a runtime of only 22.3 seconds! I retried the code above with the `nlme` mixed effects model just to make sure that the drastic speed up wasn't due to using a different library (it made almost no difference). Let's check the power estimate as well.  
+
+```{r, eval = FALSE}
+print(paste0("TOTAL POWER: ", (nrow(sim_ci) - sum(sim_ci$type_ii_err))/nrow(sim_ci) * 100, "%"))
+```
+```{r}
+## [1] "TOTAL POWER: 98.9%"
+```
+
+This simulation gave us an identical estimate relative to the `foreach`.Taken together, the results from both of these simulations indicate that we wouldn’t need the full nine days to show an effect. When you are finished, remember to shut your cluster down with the following command.
+
+```{r, eval = FALSE}
+spark_disconnect(sc)
+```
+
+I hope this post reveals how easy it is to add some parallelism to your R code. Time always seems to be in short supply when you are developing, and waiting around for an answer is a total momentum killer. Taking a bit more time up front to understand whether you can run your code in parallel – and avoiding sequential for loops – will save you a ton of time down the line.

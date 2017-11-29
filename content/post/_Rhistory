@@ -1,0 +1,512 @@
+ylab("Value") +
+theme(legend.title=element_blank())
+my_plot_theme = function(){
+font_family = "Helvetica"
+font_face = "bold"
+return(theme(
+axis.text.x = element_text(size = 18, face = font_face, family = font_family),
+axis.text.y = element_text(size = 18, face = font_face, family = font_family),
+axis.title.x = element_text(size = 20, face = font_face, family = font_family),
+axis.title.y = element_text(size = 20, face = font_face, family = font_family),
+strip.text.y = element_text(size = 18, face = font_face, family = font_family),
+plot.title = element_text(size = 18, face = font_face, family = font_family),
+legend.position = "top",
+legend.title = element_text(size = 16,
+face = font_face,
+family = font_family),
+legend.text = element_text(size = 14,
+face = font_face,
+family = font_family)
+))
+}
+bind_rows(train_df %>%
+mutate(part = "train"),
+test_df %>%
+mutate(part = "test")) %>%
+dplyr::select(date_time, part, value) %>%
+ggplot(aes(x = date_time, y = value, color = part)) +
+geom_line() +
+facet_zoom(x = date_time %in% c(test_df$date_time)) +
+theme_monokai_full() +
+my_plot_theme() +
+xlab("Date-Time") +
+ylab("Value") +
+theme(legend.title=element_blank())
+set.seed(123)
+sample_size = 100
+sample_days = train_df %>%
+select(week, day) %>%
+distinct() %>%
+sample_n(sample_size) %>%
+inner_join(train_df) %>%
+mutate(day_of_week = lubridate::wday(date_time,
+label = TRUE))
+set.seed(123)
+sample_size = 100
+sample_days = train_df %>%
+dplyr::select(week, day) %>%
+distinct() %>%
+sample_n(sample_size) %>%
+inner_join(train_df) %>%
+mutate(day_of_week = lubridate::wday(date_time,
+label = TRUE))
+```{r fig.height = 8, fig.width = 10}
+my_plot_theme = function(){
+font_family = "Helvetica"
+font_face = "bold"
+return(theme(
+axis.text.x = element_text(size = 18, face = font_face, family = font_family),
+axis.text.y = element_text(size = 18, face = font_face, family = font_family),
+axis.title.x = element_text(size = 20, face = font_face, family = font_family),
+axis.title.y = element_text(size = 20, face = font_face, family = font_family),
+strip.text.y = element_text(size = 18, face = font_face, family = font_family),
+plot.title = element_text(size = 18, face = font_face, family = font_family),
+legend.position = "top",
+legend.title = element_text(size = 16,
+face = font_face,
+family = font_family),
+legend.text = element_text(size = 14,
+face = font_face,
+family = font_family)
+))
+}
+bind_rows(train_df %>%
+mutate(part = "train"),
+test_df %>%
+mutate(part = "test")) %>%
+dplyr::select(date_time, part, value) %>%
+ggplot(aes(x = date_time, y = value, color = part)) +
+geom_line() +
+facet_zoom(x = date_time %in% c(test_df$date_time)) +
+theme_bw() +
+my_plot_theme() +
+xlab("Date-Time") +
+ylab("Value") +
+theme(legend.title=element_blank())
+set.seed(123)
+sample_size = 100
+sample_days = train_df %>%
+dplyr::select(week, day) %>%
+distinct() %>%
+sample_n(sample_size) %>%
+inner_join(train_df) %>%
+mutate(day_of_week = lubridate::wday(date_time,
+label = TRUE))
+```{r fig.height = 8, fig.width = 10}
+head(sample_days)
+ggplot(sample_days, aes(x = hour, y = value, color = day_of_week)) +
+geom_point() +
+geom_jitter()  +
+stat_smooth(se = FALSE, size = 2) +
+theme_bw() +
+my_plot_theme() +
+xlab("Hour") +
+ylab("Value") +
+facet_grid(day_of_week ~ .) +
+theme(legend.position = "none",
+axis.text.y = element_text(size = 13))
+data_ts = msts(train_df$value, seasonal.periods = c(daily_p,
+daily_p * weekly_p))
+K = 2
+fourier_train = data.frame(fourier(data_ts, K = c(K, K)))
+fourier_test_fcast <- data.frame(fourier(data_ts,
+K = c(K, K),
+h = daily_p * weekly_p))
+cbind(fourier_test_fcast,
+data.frame(date_time = test_df$date_time)) %>%
+melt(id.vars = "date_time") %>%
+ggplot(aes(x = date_time, y = value, color = variable)) +
+geom_line() +
+facet_grid(variable ~ .) +
+theme_bw() +
+my_plot_theme() +
+xlab("Date") +
+ylab("Value") +
+theme(legend.position = "none",
+axis.text.y = element_text(size = 13),
+strip.text.y = element_text(size = 13))
+ts_input = ts(data_ts, freq = daily_p * weekly_p)
+# deconstruct series into seasonal, trend, and error components
+decomp_ts = stl(ts_input, s.window = "periodic", robust = TRUE)
+# add together the seasonal and error component
+seasonal_error_part = apply(data.frame(decomp_ts$time.series)[,c(1, 3)], 1, sum)
+# extract the seasonal component
+seasonal_part = as.vector(decomp_ts$time.series[,1])
+# extract the trend component
+trend_part = ts(decomp_ts$time.series[,2])
+# generate a forecast for the trend
+trend_forecast_test = as.vector(forecast(auto.arima(trend_part),
+h = nrow(test_df))$mean)
+seasonal_train = seasonal_part[1:(nrow(train_df) - (weekly_p * daily_p))]
+seasonal_test = tail(seasonal_part, weekly_p * daily_p)
+# build the training set
+train_input = data.frame(value = head(seasonal_error_part, length(seasonal_train)),
+fourier_train[1:length(seasonal_train),],
+seasonal_lag = seasonal_train
+)
+# build the testing set
+test_input = data.frame(value = test_df$value,
+fourier_test_fcast,
+seasonal_lag = seasonal_test
+)
+y_var = "value"
+x_var = setdiff(names(train_input), y_var)
+h2o.init()
+h2o_models = h2o.automl(x = x_var,
+y = y_var,
+training_frame = as.h2o(train_input),
+max_runtime_secs = 800,
+stopping_rounds = 15,
+seed = 123
+)
+kable(head(as.data.frame(h2o_models@leaderboard), 10) %>%
+select(model_id, rmse, mae),
+align = "c")
+kable(head(as.data.frame(h2o_models@leaderboard), 10) , "html", align = "c") %>%
+kable_styling(bootstrap_options = c("striped",
+"hover"),
+full_width = TRUE) %>%
+scroll_box(width = "720px", height = "300px")
+best_model = as.data.frame(h2o_models@leader@model$model_summary) %>%
+melt()
+kable(best_model, "html", align = "c") %>%
+kable_styling(bootstrap_options = c("striped",
+"hover"),
+full_width = TRUE) %>%
+scroll_box(width = "720px", height = "300px")
+as.data.frame(h2o_models@leader@model$variable_importances) %>%
+dplyr::select(variable, percentage) %>%
+dplyr::mutate(percentage = round(percentage, 2),
+variable = factor(variable)) %>%
+dplyr::mutate(variable = fct_reorder(variable, percentage, .desc = TRUE)) %>%
+ggplot(aes(x = variable, y = percentage,
+fill = variable, label = as.character(percentage))) +
+geom_bar(stat = "identity") +
+geom_label(label.size = 1, size = 5, color = "white")  +
+theme_bw() +
+my_plot_theme() +
+theme(legend.position = "none") +
+ylab("Importance") +
+xlab("Variable") +
+theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 12))
+arima_fit = auto.arima(data_ts)
+arima_fit = auto.arima(data_ts)
+arima_fcast = forecast(arima_fit, h = nrow(test_df)$mean
+arima_fit = auto.arima(data_ts)
+arima_fcast = forecast(arima_fit, h = nrow(test_df)$mean
+arima_fit = auto.arima(data_ts)
+arima_fcast = forecast(arima_fit, h = nrow(test_df))$mean
+gbm_fcast = as.vector(predict(h2o_models@leader,
+as.h2o(test_input)))
+# add back in the trend forecast
+gbm_fcast = gbm_fcast + trend_forecast_test
+prediction_df = test_df %>%
+mutate(arima_fcast = arima_fcast,
+gbm_fcast = gbm_fcast
+) %>%
+dplyr::select(-week, -day, -hour) %>%
+dplyr::rename(actual = value)
+prediction_df %>%
+melt('date_time') %>%
+ggplot(aes(x = date_time, y = value, color = variable)) +
+geom_line(size = 1) +
+theme_bw() +
+my_plot_theme() +
+xlab("Date-Time") +
+ylab("Value") +
+theme(legend.title=element_blank())
+# function to generate quantile regression estimates
+gbm_prediction_interval = function(x_var, y_var, train_input, test_input, quantiles, seed){
+pred_interval = list()
+for(q in quantiles){
+quantile_fit = h2o.gbm(x = x_var,
+y = y_var,
+training_frame = as.h2o(train_input),
+distribution = "quantile",
+quantile_alpha = q,
+stopping_rounds = 15,
+ntrees = 5000,
+seed = seed
+)
+quantile_pred = as.vector(predict(quantile_fit, as.h2o(test_input)))
+pred_interval[[paste0("pi_", q)]] = quantile_pred
+}
+return(pred_interval)
+}
+# specify 80% prediction interval
+quantiles = c(0.1, 0.9)
+# set seed for reproduceability
+seed = 123
+pred_int= gbm_prediction_interval(x_var, y_var, train_input,
+test_input, quantiles, seed)
+pred_int_df = data.frame(lapply(pred_int, function(x) x + trend_forecast_test)) %>%
+mutate(Value = test_df$value)
+pred_int_df %>%
+mutate(`Date-Time` = test_df$date_time) %>%
+ggplot(aes(x = `Date-Time`, y = Value)) +
+geom_ribbon(aes(ymin = pi_0.1,
+ymax = pi_0.9),
+fill = "#F8766D",
+alpha = 0.7,
+linetype = 2,
+size = 2
+) +
+geom_line(size = 2
+) +
+theme_monokai_full() +
+my_plot_theme()
+pred_int_df %>%
+mutate(`Date-Time` = test_df$date_time) %>%
+ggplot(aes(x = `Date-Time`, y = Value)) +
+geom_ribbon(aes(ymin = pi_0.1,
+ymax = pi_0.9),
+fill = "#F8766D",
+alpha = 0.7,
+linetype = 2,
+size = 2
+) +
+geom_line(size = 2
+) +
+theme_bw() +
+my_plot_theme()
+print(round(sum(ifelse(pred_int_df$actual - pred_int_df$pi_0.1 >= 0, 1, 0))/nrow(pred_int_df) * 100, 1))
+head(pred_int_df)
+print(round(sum(ifelse(pred_int_df$Value - pred_int_df$pi_0.1 >= 0, 1, 0))/nrow(pred_int_df) * 100, 1))
+print(paste0(round(sum(ifelse(pred_int_df$Value - pred_int_df$pi_0.1 >= 0, 1, 0))/nrow(pred_int_df) * 100, 1)),
+"%")
+print(round(sum(ifelse(pred_int_df$Value - pred_int_df$pi_0.1 >= 0, 1, 0))/nrow(pred_int_df) * 100, 1))
+print(round(sum(ifelse(pred_int_df$Value - pred_int_df$pi_0.9 >= 0, 1, 0))/nrow(pred_int_df) * 100, 1))
+library(blogdown)
+library(kableExtra)
+library(rmarkdown)
+library(png)
+library(raster)
+library(devtools)
+library(dplyr)
+library(VSURF)
+library(quantregForest)
+library(broom)
+library(merTools)
+library(lubridate)
+# /Users/mlebo1/Desktop/site/themes/hugo-academic/static/img (this is where the favicon goes)
+setwd('/Users/mlebo1/Desktop/Site')
+blogdown::serve_site()
+libs = c('data.table','h2o','forecast',
+'lubridate','forcats',
+'ggforce', 'ggplot2',
+'reshape', 'knitr',
+'kableExtra',
+'dplyr')
+lapply(libs, require, character.only = TRUE)
+data_source = 'https://open-enernoc-data.s3.amazonaws.com/anon/csv/832.csv'
+df_elec = fread(data_source) %>% data.frame()
+df_elec = df_elec %>%
+dplyr::select(-anomaly, -timestamp) %>%
+dplyr::rename(date_time = dttm_utc) %>%
+mutate(date_only = as.Date(date_time)) %>%
+mutate(month = lubridate::month(date_time, label = TRUE),
+week = as.factor(week(date_time)),
+hour = lubridate::hour(date_time),
+day = lubridate::day(date_time))
+df_hourly = df_elec %>%
+group_by(date_only, month, hour) %>%
+summarise(value = mean(value)) %>%
+ungroup() %>%
+mutate(hour = ifelse(nchar(as.character(hour)) == 1, paste0("0", as.character(hour)),
+hour)) %>%
+mutate(hour = paste(hour, "00", "00", sep = ":")) %>%
+mutate(date_time = lubridate::ymd_hms(paste(date_only, hour))) %>%
+dplyr::select(date_time, month, value) %>%
+mutate(week = as.factor(week(date_time)),
+day = lubridate::day(date_time),
+hour = lubridate::hour(date_time)
+)
+df_hourly = df_hourly %>%
+filter(month %in% c('Feb','Mar', 'Apr', 'May', 'Jun')) %>%
+dplyr::select(-month)
+# daily period (24 hours)
+daily_p = 24
+# weekly period (7 days)
+weekly_p = 7
+# hold out last week of time series for testing
+train_df = df_hourly[1:(nrow(df_hourly) - daily_p * weekly_p),]
+test_df = tail(df_hourly, daily_p * weekly_p)
+my_plot_theme = function(){
+font_family = "Helvetica"
+font_face = "bold"
+return(theme(
+axis.text.x = element_text(size = 18, face = font_face, family = font_family),
+axis.text.y = element_text(size = 18, face = font_face, family = font_family),
+axis.title.x = element_text(size = 20, face = font_face, family = font_family),
+axis.title.y = element_text(size = 20, face = font_face, family = font_family),
+strip.text.y = element_text(size = 18, face = font_face, family = font_family),
+plot.title = element_text(size = 18, face = font_face, family = font_family),
+legend.position = "top",
+legend.title = element_text(size = 16,
+face = font_face,
+family = font_family),
+legend.text = element_text(size = 14,
+face = font_face,
+family = font_family)
+))
+}
+bind_rows(train_df %>%
+mutate(part = "train"),
+test_df %>%
+mutate(part = "test")) %>%
+dplyr::select(date_time, part, value) %>%
+ggplot(aes(x = date_time, y = value, color = part)) +
+geom_line() +
+facet_zoom(x = date_time %in% c(test_df$date_time)) +
+theme_bw() +
+my_plot_theme() +
+xlab("Date-Time") +
+ylab("Value") +
+theme(legend.title=element_blank())
+set.seed(123)
+sample_size = 100
+sample_days = train_df %>%
+dplyr::select(week, day) %>%
+distinct() %>%
+sample_n(sample_size) %>%
+inner_join(train_df) %>%
+mutate(day_of_week = lubridate::wday(date_time,
+label = TRUE))
+head(sample_days)
+ggplot(sample_days, aes(x = hour, y = value, color = day_of_week)) +
+geom_point() +
+geom_jitter()  +
+stat_smooth(se = FALSE, size = 2) +
+theme_bw() +
+my_plot_theme() +
+xlab("Hour") +
+ylab("Value") +
+facet_grid(day_of_week ~ .) +
+theme(legend.position = "none",
+axis.text.y = element_text(size = 13))
+ggplot(sample_days, aes(x = hour, y = value, color = day_of_week)) +
+geom_point() +
+geom_jitter()  +
+stat_smooth(se = FALSE, size = 2) +
+theme_bw() +
+my_plot_theme() +
+xlab("Hour") +
+ylab("Value") +
+facet_grid(day_of_week ~ .) +
+theme(legend.position = "none",
+axis.text.y = element_text(size = 13))
+data_ts = msts(train_df$value, seasonal.periods = c(daily_p,
+daily_p * weekly_p))
+K = 2
+fourier_train = data.frame(fourier(data_ts, K = c(K, K)))
+fourier_test_fcast <- data.frame(fourier(data_ts,
+K = c(K, K),
+h = daily_p * weekly_p))
+cbind(fourier_test_fcast,
+data.frame(date_time = test_df$date_time)) %>%
+melt(id.vars = "date_time") %>%
+ggplot(aes(x = date_time, y = value, color = variable)) +
+geom_line() +
+facet_grid(variable ~ .) +
+theme_bw() +
+my_plot_theme() +
+xlab("Date") +
+ylab("Value") +
+theme(legend.position = "none",
+axis.text.y = element_text(size = 13),
+strip.text.y = element_text(size = 13))
+ts_input = ts(data_ts, freq = daily_p * weekly_p)
+# deconstruct series into seasonal, trend, and error components
+decomp_ts = stl(ts_input, s.window = "periodic", robust = TRUE)
+# add together the seasonal and error component
+seasonal_error_part = apply(data.frame(decomp_ts$time.series)[,c(1, 3)], 1, sum)
+# extract the seasonal component
+seasonal_part = as.vector(decomp_ts$time.series[,1])
+# extract the trend component
+trend_part = ts(decomp_ts$time.series[,2])
+# generate a forecast for the trend
+trend_forecast_test = as.vector(forecast(auto.arima(trend_part),
+h = nrow(test_df))$mean)
+seasonal_train = seasonal_part[1:(nrow(train_df) - (weekly_p * daily_p))]
+seasonal_test = tail(seasonal_part, weekly_p * daily_p)
+# build the training set
+train_input = data.frame(value = head(seasonal_error_part, length(seasonal_train)),
+fourier_train[1:length(seasonal_train),],
+seasonal_lag = seasonal_train
+)
+# build the testing set
+test_input = data.frame(value = test_df$value,
+fourier_test_fcast,
+seasonal_lag = seasonal_test
+)
+y_var = "value"
+x_var = setdiff(names(train_input), y_var)
+h2o.init()
+h2o_models = h2o.automl(x = x_var,
+y = y_var,
+training_frame = as.h2o(train_input),
+max_runtime_secs = 40,
+stopping_rounds = 15,
+seed = 123
+)
+kable(head(as.data.frame(h2o_models@leaderboard), 10) , "html", align = "c") %>%
+kable_styling(bootstrap_options = c("striped",
+"hover"),
+full_width = TRUE) %>%
+scroll_box(width = "720px", height = "300px")
+best_model = as.data.frame(h2o_models@leader@model$model_summary) %>%
+melt()
+kable(best_model, "html", align = "c") %>%
+kable_styling(bootstrap_options = c("striped",
+"hover"),
+full_width = TRUE) %>%
+scroll_box(width = "720px", height = "300px")
+as.data.frame(h2o_models@leader@model$variable_importances) %>%
+dplyr::select(variable, percentage) %>%
+dplyr::mutate(percentage = round(percentage, 2),
+variable = factor(variable)) %>%
+dplyr::mutate(variable = fct_reorder(variable, percentage, .desc = TRUE)) %>%
+ggplot(aes(x = variable, y = percentage,
+fill = variable, label = as.character(percentage))) +
+geom_bar(stat = "identity") +
+geom_label(label.size = 1, size = 5, color = "white")  +
+theme_bw() +
+my_plot_theme() +
+theme(legend.position = "none") +
+ylab("Importance") +
+xlab("Variable") +
+theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 12))
+set.seed(123)
+y_var = "value"
+x_var = setdiff(names(train_input), y_var)
+h2o.init()
+h2o_models = h2o.automl(x = x_var,
+y = y_var,
+training_frame = as.h2o(train_input),
+max_runtime_secs = 120,
+stopping_rounds = 15,
+seed = 123
+)
+kable(head(as.data.frame(h2o_models@leaderboard), 10) , "html", align = "c") %>%
+kable_styling(bootstrap_options = c("striped",
+"hover"),
+full_width = TRUE) %>%
+scroll_box(width = "720px", height = "300px")
+best_model = as.data.frame(h2o_models@leader@model$model_summary) %>%
+melt()
+kable(best_model, "html", align = "c") %>%
+kable_styling(bootstrap_options = c("striped",
+"hover"),
+full_width = TRUE) %>%
+scroll_box(width = "720px", height = "300px")
+set.seed(123)
+y_var = "value"
+x_var = setdiff(names(train_input), y_var)
+h2o.init()
+h2o_models = h2o.automl(x = x_var,
+y = y_var,
+training_frame = as.h2o(train_input),
+max_runtime_secs = 800,
+stopping_rounds = 15,
+seed = 123
+)

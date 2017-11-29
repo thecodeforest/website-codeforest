@@ -1,0 +1,1298 @@
+---
+title: "Feature Selection for the Wine Connoisseur"
+author: "Mark LeBoeuf"
+date: '2017-08-14T21:13:14-05:00'
+summary: Feature selection is an integral part of machine learning and this post
+  explores what happens when lots of irrelevant features are added to the modeling
+  process. We’ll also identify which algorithms are affected the most by such features.
+  These questions will be addressed as we build a classifier and try to predict which
+  wines we’ll like based on their chemical properties. So pour yourself a glass of
+  Pinot Noir and fire up your R terminal!
+tags: ["R", "H2O", "Feature Selection", "Classification", "Wine"]
+categories: ["R", "H2O", "Feature Selection", "Classification", "Wine"]
+---
+
+
+
+<p><img src="feature_selection_images/grapes.jpg" width="800px" height="800px" /></p>
+<div id="overview" class="section level3">
+<h3>Overview</h3>
+<p>There are few reasons for reducing the number of potential input features when building a model:</p>
+<ul>
+<li><strong>Faster training times</strong></li>
+<li><strong>Easier interpretation</strong></li>
+<li><strong>Improved accuracy by reducing the chance of overfitting</strong></li>
+</ul>
+<p>The focus here will primarly be on point three, as we address two questions:</p>
+<ul>
+<li><strong>Does having noisy, unnecessary variables as inputs reduce classification performance?</strong></li>
+<li><strong>And, if so, which algorithms are the most robust to the ill-effects of these unnecessary variables?</strong></li>
+</ul>
+<p>We’ll explore these questions with one my favorite datasets located <a href="https://archive.ics.uci.edu/ml/machine-learning-databases/wine-quality/">here</a>. Based on the methodology outlined <a href="http://projects.csail.mit.edu/wiki/pub/Evodesign/SensoryEvaluationsDatabase/winequality09.pdf">here</a>, a bunch of Wine experts got together and evaluated both White and Red wines. Each row represents the chemical properties of a wine in addition to a rating (0 = very bad, 10 = excellent). Each wine was rated by at least three people, and the median of their ratings was used as the final score. I have no idea how you get paid to drink wine, but somewhere in my life, I chose the wrong career path. Thus, the goal here is to predict the rating based on the chemical properties of the wine, such as its pH or Alcohol Concentration.</p>
+<p>Let’s load up the libraries we’ll need as well as a custom plotting function.</p>
+<p>Here we’ll read the wine quality ratings directly for the source. We’ll also convert the rating system from a 1-10 scale to binary for the sake of simplicity. Any wine with a rating greater than seven receives the highly coveted “IdDrinkThat”, while all others receive the dreaded “NoThanks” label.</p>
+<pre class="r"><code>red_file = &#39;winequality-red.csv&#39;
+white_file = &#39;winequality-white.csv&#39;
+base_url = &#39;https://archive.ics.uci.edu/ml/machine-learning-databases/wine-quality/&#39;
+red_wine = fread(paste0(base_url, red_file)) %&gt;% 
+           data.frame()
+white_wine = fread(paste0(base_url, white_file)) %&gt;% 
+           data.frame()
+wine_df = bind_rows(red_wine,
+                    white_wine
+                    ) %&gt;% 
+          clean_names() %&gt;% 
+          mutate(wine_class = ifelse(quality &gt;= 7,
+                                            &quot;IdDrinkThat&quot;,
+                                            &quot;NoThanks&quot;)) %&gt;%
+          mutate(wine_class = as.factor(wine_class)) %&gt;% 
+          select(-quality)</code></pre>
+<p>As usual, let’s peak at the data to make sure there aren’t any unwanted surprises.</p>
+<div style="border: 1px solid #ddd; padding: 5px; overflow-y: scroll; height:410px; overflow-x: scroll; width:720px; ">
+<table class="table table-striped table-hover" style="width: auto !important; margin-left: auto; margin-right: auto;">
+<thead>
+<tr>
+<th style="text-align:center;">
+fixed_acidity
+</th>
+<th style="text-align:center;">
+volatile_acidity
+</th>
+<th style="text-align:center;">
+citric_acid
+</th>
+<th style="text-align:center;">
+residual_sugar
+</th>
+<th style="text-align:center;">
+chlorides
+</th>
+<th style="text-align:center;">
+free_sulfur_dioxide
+</th>
+<th style="text-align:center;">
+total_sulfur_dioxide
+</th>
+<th style="text-align:center;">
+density
+</th>
+<th style="text-align:center;">
+ph
+</th>
+<th style="text-align:center;">
+sulphates
+</th>
+<th style="text-align:center;">
+alcohol
+</th>
+<th style="text-align:center;">
+wine_class
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center;">
+7.4
+</td>
+<td style="text-align:center;">
+0.700
+</td>
+<td style="text-align:center;">
+0.00
+</td>
+<td style="text-align:center;">
+1.9
+</td>
+<td style="text-align:center;">
+0.076
+</td>
+<td style="text-align:center;">
+11
+</td>
+<td style="text-align:center;">
+34
+</td>
+<td style="text-align:center;">
+0.9978
+</td>
+<td style="text-align:center;">
+3.51
+</td>
+<td style="text-align:center;">
+0.56
+</td>
+<td style="text-align:center;">
+9.4
+</td>
+<td style="text-align:center;">
+NoThanks
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+7.8
+</td>
+<td style="text-align:center;">
+0.880
+</td>
+<td style="text-align:center;">
+0.00
+</td>
+<td style="text-align:center;">
+2.6
+</td>
+<td style="text-align:center;">
+0.098
+</td>
+<td style="text-align:center;">
+25
+</td>
+<td style="text-align:center;">
+67
+</td>
+<td style="text-align:center;">
+0.9968
+</td>
+<td style="text-align:center;">
+3.20
+</td>
+<td style="text-align:center;">
+0.68
+</td>
+<td style="text-align:center;">
+9.8
+</td>
+<td style="text-align:center;">
+NoThanks
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+7.8
+</td>
+<td style="text-align:center;">
+0.760
+</td>
+<td style="text-align:center;">
+0.04
+</td>
+<td style="text-align:center;">
+2.3
+</td>
+<td style="text-align:center;">
+0.092
+</td>
+<td style="text-align:center;">
+15
+</td>
+<td style="text-align:center;">
+54
+</td>
+<td style="text-align:center;">
+0.9970
+</td>
+<td style="text-align:center;">
+3.26
+</td>
+<td style="text-align:center;">
+0.65
+</td>
+<td style="text-align:center;">
+9.8
+</td>
+<td style="text-align:center;">
+NoThanks
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+11.2
+</td>
+<td style="text-align:center;">
+0.280
+</td>
+<td style="text-align:center;">
+0.56
+</td>
+<td style="text-align:center;">
+1.9
+</td>
+<td style="text-align:center;">
+0.075
+</td>
+<td style="text-align:center;">
+17
+</td>
+<td style="text-align:center;">
+60
+</td>
+<td style="text-align:center;">
+0.9980
+</td>
+<td style="text-align:center;">
+3.16
+</td>
+<td style="text-align:center;">
+0.58
+</td>
+<td style="text-align:center;">
+9.8
+</td>
+<td style="text-align:center;">
+NoThanks
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+7.4
+</td>
+<td style="text-align:center;">
+0.700
+</td>
+<td style="text-align:center;">
+0.00
+</td>
+<td style="text-align:center;">
+1.9
+</td>
+<td style="text-align:center;">
+0.076
+</td>
+<td style="text-align:center;">
+11
+</td>
+<td style="text-align:center;">
+34
+</td>
+<td style="text-align:center;">
+0.9978
+</td>
+<td style="text-align:center;">
+3.51
+</td>
+<td style="text-align:center;">
+0.56
+</td>
+<td style="text-align:center;">
+9.4
+</td>
+<td style="text-align:center;">
+NoThanks
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+7.4
+</td>
+<td style="text-align:center;">
+0.660
+</td>
+<td style="text-align:center;">
+0.00
+</td>
+<td style="text-align:center;">
+1.8
+</td>
+<td style="text-align:center;">
+0.075
+</td>
+<td style="text-align:center;">
+13
+</td>
+<td style="text-align:center;">
+40
+</td>
+<td style="text-align:center;">
+0.9978
+</td>
+<td style="text-align:center;">
+3.51
+</td>
+<td style="text-align:center;">
+0.56
+</td>
+<td style="text-align:center;">
+9.4
+</td>
+<td style="text-align:center;">
+NoThanks
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+7.9
+</td>
+<td style="text-align:center;">
+0.600
+</td>
+<td style="text-align:center;">
+0.06
+</td>
+<td style="text-align:center;">
+1.6
+</td>
+<td style="text-align:center;">
+0.069
+</td>
+<td style="text-align:center;">
+15
+</td>
+<td style="text-align:center;">
+59
+</td>
+<td style="text-align:center;">
+0.9964
+</td>
+<td style="text-align:center;">
+3.30
+</td>
+<td style="text-align:center;">
+0.46
+</td>
+<td style="text-align:center;">
+9.4
+</td>
+<td style="text-align:center;">
+NoThanks
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+7.3
+</td>
+<td style="text-align:center;">
+0.650
+</td>
+<td style="text-align:center;">
+0.00
+</td>
+<td style="text-align:center;">
+1.2
+</td>
+<td style="text-align:center;">
+0.065
+</td>
+<td style="text-align:center;">
+15
+</td>
+<td style="text-align:center;">
+21
+</td>
+<td style="text-align:center;">
+0.9946
+</td>
+<td style="text-align:center;">
+3.39
+</td>
+<td style="text-align:center;">
+0.47
+</td>
+<td style="text-align:center;">
+10.0
+</td>
+<td style="text-align:center;">
+IdDrinkThat
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+7.8
+</td>
+<td style="text-align:center;">
+0.580
+</td>
+<td style="text-align:center;">
+0.02
+</td>
+<td style="text-align:center;">
+2.0
+</td>
+<td style="text-align:center;">
+0.073
+</td>
+<td style="text-align:center;">
+9
+</td>
+<td style="text-align:center;">
+18
+</td>
+<td style="text-align:center;">
+0.9968
+</td>
+<td style="text-align:center;">
+3.36
+</td>
+<td style="text-align:center;">
+0.57
+</td>
+<td style="text-align:center;">
+9.5
+</td>
+<td style="text-align:center;">
+IdDrinkThat
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+7.5
+</td>
+<td style="text-align:center;">
+0.500
+</td>
+<td style="text-align:center;">
+0.36
+</td>
+<td style="text-align:center;">
+6.1
+</td>
+<td style="text-align:center;">
+0.071
+</td>
+<td style="text-align:center;">
+17
+</td>
+<td style="text-align:center;">
+102
+</td>
+<td style="text-align:center;">
+0.9978
+</td>
+<td style="text-align:center;">
+3.35
+</td>
+<td style="text-align:center;">
+0.80
+</td>
+<td style="text-align:center;">
+10.5
+</td>
+<td style="text-align:center;">
+NoThanks
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+6.7
+</td>
+<td style="text-align:center;">
+0.580
+</td>
+<td style="text-align:center;">
+0.08
+</td>
+<td style="text-align:center;">
+1.8
+</td>
+<td style="text-align:center;">
+0.097
+</td>
+<td style="text-align:center;">
+15
+</td>
+<td style="text-align:center;">
+65
+</td>
+<td style="text-align:center;">
+0.9959
+</td>
+<td style="text-align:center;">
+3.28
+</td>
+<td style="text-align:center;">
+0.54
+</td>
+<td style="text-align:center;">
+9.2
+</td>
+<td style="text-align:center;">
+NoThanks
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+7.5
+</td>
+<td style="text-align:center;">
+0.500
+</td>
+<td style="text-align:center;">
+0.36
+</td>
+<td style="text-align:center;">
+6.1
+</td>
+<td style="text-align:center;">
+0.071
+</td>
+<td style="text-align:center;">
+17
+</td>
+<td style="text-align:center;">
+102
+</td>
+<td style="text-align:center;">
+0.9978
+</td>
+<td style="text-align:center;">
+3.35
+</td>
+<td style="text-align:center;">
+0.80
+</td>
+<td style="text-align:center;">
+10.5
+</td>
+<td style="text-align:center;">
+NoThanks
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+5.6
+</td>
+<td style="text-align:center;">
+0.615
+</td>
+<td style="text-align:center;">
+0.00
+</td>
+<td style="text-align:center;">
+1.6
+</td>
+<td style="text-align:center;">
+0.089
+</td>
+<td style="text-align:center;">
+16
+</td>
+<td style="text-align:center;">
+59
+</td>
+<td style="text-align:center;">
+0.9943
+</td>
+<td style="text-align:center;">
+3.58
+</td>
+<td style="text-align:center;">
+0.52
+</td>
+<td style="text-align:center;">
+9.9
+</td>
+<td style="text-align:center;">
+NoThanks
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+7.8
+</td>
+<td style="text-align:center;">
+0.610
+</td>
+<td style="text-align:center;">
+0.29
+</td>
+<td style="text-align:center;">
+1.6
+</td>
+<td style="text-align:center;">
+0.114
+</td>
+<td style="text-align:center;">
+9
+</td>
+<td style="text-align:center;">
+29
+</td>
+<td style="text-align:center;">
+0.9974
+</td>
+<td style="text-align:center;">
+3.26
+</td>
+<td style="text-align:center;">
+1.56
+</td>
+<td style="text-align:center;">
+9.1
+</td>
+<td style="text-align:center;">
+NoThanks
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+8.9
+</td>
+<td style="text-align:center;">
+0.620
+</td>
+<td style="text-align:center;">
+0.18
+</td>
+<td style="text-align:center;">
+3.8
+</td>
+<td style="text-align:center;">
+0.176
+</td>
+<td style="text-align:center;">
+52
+</td>
+<td style="text-align:center;">
+145
+</td>
+<td style="text-align:center;">
+0.9986
+</td>
+<td style="text-align:center;">
+3.16
+</td>
+<td style="text-align:center;">
+0.88
+</td>
+<td style="text-align:center;">
+9.2
+</td>
+<td style="text-align:center;">
+NoThanks
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+8.9
+</td>
+<td style="text-align:center;">
+0.620
+</td>
+<td style="text-align:center;">
+0.19
+</td>
+<td style="text-align:center;">
+3.9
+</td>
+<td style="text-align:center;">
+0.170
+</td>
+<td style="text-align:center;">
+51
+</td>
+<td style="text-align:center;">
+148
+</td>
+<td style="text-align:center;">
+0.9986
+</td>
+<td style="text-align:center;">
+3.17
+</td>
+<td style="text-align:center;">
+0.93
+</td>
+<td style="text-align:center;">
+9.2
+</td>
+<td style="text-align:center;">
+NoThanks
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+8.5
+</td>
+<td style="text-align:center;">
+0.280
+</td>
+<td style="text-align:center;">
+0.56
+</td>
+<td style="text-align:center;">
+1.8
+</td>
+<td style="text-align:center;">
+0.092
+</td>
+<td style="text-align:center;">
+35
+</td>
+<td style="text-align:center;">
+103
+</td>
+<td style="text-align:center;">
+0.9969
+</td>
+<td style="text-align:center;">
+3.30
+</td>
+<td style="text-align:center;">
+0.75
+</td>
+<td style="text-align:center;">
+10.5
+</td>
+<td style="text-align:center;">
+IdDrinkThat
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+8.1
+</td>
+<td style="text-align:center;">
+0.560
+</td>
+<td style="text-align:center;">
+0.28
+</td>
+<td style="text-align:center;">
+1.7
+</td>
+<td style="text-align:center;">
+0.368
+</td>
+<td style="text-align:center;">
+16
+</td>
+<td style="text-align:center;">
+56
+</td>
+<td style="text-align:center;">
+0.9968
+</td>
+<td style="text-align:center;">
+3.11
+</td>
+<td style="text-align:center;">
+1.28
+</td>
+<td style="text-align:center;">
+9.3
+</td>
+<td style="text-align:center;">
+NoThanks
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+7.4
+</td>
+<td style="text-align:center;">
+0.590
+</td>
+<td style="text-align:center;">
+0.08
+</td>
+<td style="text-align:center;">
+4.4
+</td>
+<td style="text-align:center;">
+0.086
+</td>
+<td style="text-align:center;">
+6
+</td>
+<td style="text-align:center;">
+29
+</td>
+<td style="text-align:center;">
+0.9974
+</td>
+<td style="text-align:center;">
+3.38
+</td>
+<td style="text-align:center;">
+0.50
+</td>
+<td style="text-align:center;">
+9.0
+</td>
+<td style="text-align:center;">
+NoThanks
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+7.9
+</td>
+<td style="text-align:center;">
+0.320
+</td>
+<td style="text-align:center;">
+0.51
+</td>
+<td style="text-align:center;">
+1.8
+</td>
+<td style="text-align:center;">
+0.341
+</td>
+<td style="text-align:center;">
+17
+</td>
+<td style="text-align:center;">
+56
+</td>
+<td style="text-align:center;">
+0.9969
+</td>
+<td style="text-align:center;">
+3.04
+</td>
+<td style="text-align:center;">
+1.08
+</td>
+<td style="text-align:center;">
+9.2
+</td>
+<td style="text-align:center;">
+NoThanks
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+8.9
+</td>
+<td style="text-align:center;">
+0.220
+</td>
+<td style="text-align:center;">
+0.48
+</td>
+<td style="text-align:center;">
+1.8
+</td>
+<td style="text-align:center;">
+0.077
+</td>
+<td style="text-align:center;">
+29
+</td>
+<td style="text-align:center;">
+60
+</td>
+<td style="text-align:center;">
+0.9968
+</td>
+<td style="text-align:center;">
+3.39
+</td>
+<td style="text-align:center;">
+0.53
+</td>
+<td style="text-align:center;">
+9.4
+</td>
+<td style="text-align:center;">
+NoThanks
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+7.6
+</td>
+<td style="text-align:center;">
+0.390
+</td>
+<td style="text-align:center;">
+0.31
+</td>
+<td style="text-align:center;">
+2.3
+</td>
+<td style="text-align:center;">
+0.082
+</td>
+<td style="text-align:center;">
+23
+</td>
+<td style="text-align:center;">
+71
+</td>
+<td style="text-align:center;">
+0.9982
+</td>
+<td style="text-align:center;">
+3.52
+</td>
+<td style="text-align:center;">
+0.65
+</td>
+<td style="text-align:center;">
+9.7
+</td>
+<td style="text-align:center;">
+NoThanks
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+7.9
+</td>
+<td style="text-align:center;">
+0.430
+</td>
+<td style="text-align:center;">
+0.21
+</td>
+<td style="text-align:center;">
+1.6
+</td>
+<td style="text-align:center;">
+0.106
+</td>
+<td style="text-align:center;">
+10
+</td>
+<td style="text-align:center;">
+37
+</td>
+<td style="text-align:center;">
+0.9966
+</td>
+<td style="text-align:center;">
+3.17
+</td>
+<td style="text-align:center;">
+0.91
+</td>
+<td style="text-align:center;">
+9.5
+</td>
+<td style="text-align:center;">
+NoThanks
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+8.5
+</td>
+<td style="text-align:center;">
+0.490
+</td>
+<td style="text-align:center;">
+0.11
+</td>
+<td style="text-align:center;">
+2.3
+</td>
+<td style="text-align:center;">
+0.084
+</td>
+<td style="text-align:center;">
+9
+</td>
+<td style="text-align:center;">
+67
+</td>
+<td style="text-align:center;">
+0.9968
+</td>
+<td style="text-align:center;">
+3.17
+</td>
+<td style="text-align:center;">
+0.53
+</td>
+<td style="text-align:center;">
+9.4
+</td>
+<td style="text-align:center;">
+NoThanks
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+6.9
+</td>
+<td style="text-align:center;">
+0.400
+</td>
+<td style="text-align:center;">
+0.14
+</td>
+<td style="text-align:center;">
+2.4
+</td>
+<td style="text-align:center;">
+0.085
+</td>
+<td style="text-align:center;">
+21
+</td>
+<td style="text-align:center;">
+40
+</td>
+<td style="text-align:center;">
+0.9968
+</td>
+<td style="text-align:center;">
+3.43
+</td>
+<td style="text-align:center;">
+0.63
+</td>
+<td style="text-align:center;">
+9.7
+</td>
+<td style="text-align:center;">
+NoThanks
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>This dataset is exceptionally clean. Typically we would do some exploratory analysis to check for outliers, missing values, incorrect codings, or any other number of problems that can sabotage our predictions. In this case, we can go right into the variable selection.</p>
+<p>We’ll initially leverage the <strong>gradient boosted machine (GBM)</strong> algorithm in the <code>h2o</code> library for variable selection. One of the nice features of GBM is that it automatically tells you which variables are important. Recall that GBM is an iterative algorithm that fits many simple decision trees, where the errors from the prior tree become the dependent variable for each subsequent tree. A feature’s importance is determined by how much its introduction into a given tree reduces the error. The total reduction in error for a given feature is then averaged across all of the trees the feature appeared in. Thus splitting on important variables should lead to larger reductions in error during training relative to less important variables.</p>
+<p>With that in mind let’s do an initial pass and see which variables are important. We’ll do a 70⁄30 train/test split, start <code>h2o</code>, and fit an initial model.</p>
+<pre class="r"><code>trainTestSplit = function(df, split_proportion){
+  set.seed(123)
+  out_list = list()
+  data_split = sample(1:2, 
+                      size = nrow(df), 
+                      prob = split_proportion, 
+                      replace = TRUE)
+  
+  out_list$train = df[data_split == 1,]
+  out_list$test = df[data_split == 2,]
+  return(out_list)
+}
+split_proportion = c(0.7, 0.3)
+df_split = trainTestSplit(wine_df, split_proportion)</code></pre>
+<p>Next we’ll calculate our variable importance metric.</p>
+<pre class="r"><code>h2o.init(nthreads = -1)
+train_h2o = as.h2o(df_split$train)
+test_h2o = as.h2o(df_split$test)
+y_var = &quot;wine_class&quot;
+x_var = setdiff(names(train_h2o), y_var)
+gbm_fit = h2o.gbm(x = x_var, 
+                  y = y_var,
+                  distribution = &quot;bernoulli&quot;,
+                  training_frame = train_h2o,
+                  stopping_rounds = 3,
+                  stopping_metric = &quot;AUC&quot;,
+                  verbose = FALSE
+                  )</code></pre>
+<p>And let’s plot our results based on the relative importance of each feature.</p>
+<pre class="r"><code>  data.frame(gbm_fit@model$variable_importances) %&gt;% 
+    select(variable, relative_importance) %&gt;% 
+    mutate(relative_importance = round(relative_importance),
+                variable = factor(variable)) %&gt;% 
+    mutate(variable = fct_reorder(variable, 
+                                  relative_importance, .desc = TRUE)) %&gt;% 
+  ggplot(aes(x = variable, 
+             y = relative_importance,
+             fill = variable, 
+             label = as.character(relative_importance))) + 
+    geom_bar(stat = &quot;identity&quot;) + 
+    geom_label(label.size = 1, size = 5, color = &quot;white&quot;)  + 
+    theme_bw() + 
+    my_plot_theme() + 
+    theme(legend.position = &quot;none&quot;) + 
+    ylab(&quot;Relative Importance&quot;) + 
+    xlab(&quot;Variable&quot;) + 
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 12))</code></pre>
+<p><img src="/post/feature_selection_wine_files/figure-html/unnamed-chunk-10-1.png" width="960" /></p>
+<p>It looks like all of the variables have some degree of influence on classification, so we’ll continue with the full model. Next, we’re going to calculate AUC (Area Under Curve) for the following methods:</p>
+<ul>
+<li><strong>GBM</strong></li>
+<li><strong>Random Forest (RF)</strong></li>
+<li><strong>Neural Network (NN)</strong></li>
+<li><strong>Logistic Regression (LR)</strong></li>
+</ul>
+<p>We’ll use this as a point of comparison as additional irrelevant predictor variables are added. Our goal is to see how the addition of such variables affects AUC on the test set. Let’s calculate our baseline numbers.</p>
+<pre class="r"><code>rf_fit = h2o.randomForest(x = x_var,
+                          y = y_var,
+                          training_frame = train_h2o,
+                          stopping_rounds = 3,
+                          stopping_metric = &quot;AUC&quot;
+                          )
+
+nn_fit = h2o.deeplearning(x = x_var,
+                          y = y_var,
+                          training_frame = train_h2o,
+                          stopping_rounds = 3,
+                          stopping_metric = &quot;AUC&quot;)
+
+glm_fit = h2o.glm(x = x_var,
+                   y = y_var,
+                   family = &quot;binomial&quot;,
+                   training_frame = train_h2o)
+
+gbm_auc = h2o.auc(h2o.performance(gbm_fit, newdata = test_h2o))
+rf_auc = h2o.auc(h2o.performance(rf_fit, newdata = test_h2o))
+nn_auc = h2o.auc(h2o.performance(nn_fit, newdata = test_h2o))
+glm_auc = h2o.auc(h2o.performance(glm_fit, newdata = test_h2o))
+
+auc_df = data.frame(n_noise_vars = rep(0, 4),
+                    method = c(&#39;gbm&#39;, &#39;rf&#39;, &#39;nn&#39;, &#39;glm&#39;),
+                    AUC = c(gbm_auc, rf_auc, nn_auc, glm_auc)) %&gt;% 
+         arrange(desc(AUC))</code></pre>
+<div style="border: 1px solid #ddd; padding: 5px; overflow-y: scroll; height:200px; overflow-x: scroll; width:720px; ">
+<table class="table table-striped table-hover" style="margin-left: auto; margin-right: auto;">
+<thead>
+<tr>
+<th style="text-align:center;">
+n_noise_vars
+</th>
+<th style="text-align:center;">
+method
+</th>
+<th style="text-align:center;">
+AUC
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center;">
+0
+</td>
+<td style="text-align:center;">
+rf
+</td>
+<td style="text-align:center;">
+0.9186806
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+0
+</td>
+<td style="text-align:center;">
+gbm
+</td>
+<td style="text-align:center;">
+0.8889589
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+0
+</td>
+<td style="text-align:center;">
+nn
+</td>
+<td style="text-align:center;">
+0.8417844
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+0
+</td>
+<td style="text-align:center;">
+glm
+</td>
+<td style="text-align:center;">
+0.8179276
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>This provides us with a general baseline. In the following section, we’ll see what happens to the Area Under the Curve (AUC) as we add in lots of irrelevant predictors. But first, let’s explore why we are using AUC as our evaluation metric.</p>
+</div>
+<div id="auc-as-a-measure-of-classification-accuracy" class="section level3">
+<h3>AUC as a Measure of Classification Accuracy</h3>
+<p>Measuring model performance when your dependent variable is binary is more “involved” than measuring performance with a continuous dependent variable. With a continuous DV, large residuals are worse than small residuals, and this can be quantified along a continuum. In contrast, you can have a classifier that’s extremely accurate – it provides the correct classification 99.99% of the time – but actually doesn’t tell you anything useful. This situation typically arises when you have imbalanced classes, such as trying to predict whether or not someone has a disease when it only occurs in 1 of 100,000 people. By chance alone, the classifier would be right 99,999 times out of 100,000 if you just said: “no one has the disease ever”.</p>
+<p>Let’s consider the class balance in our wine dataset</p>
+<pre class="r"><code>print(round(table(wine_df$wine_class)/nrow(wine_df) * 100, 1))</code></pre>
+<pre class="r"><code>## 
+## IdDrinkThat    NoThanks 
+##        19.7        80.3</code></pre>
+<p>According to our refined, discerning pallette, 80% of wines would fall by chance alone in the “NoThanks”&quot; category. We could achieve 80% accuracy by simply assigning a label of “NoThanks” to every new wine we encountered. This would obviously be a terrible idea, because then we’d never get to drink any wine! Thus, in cases where your classes are unevenly distributed, accuracy might not be the best evaluation metric.</p>
+<p>AUC isn’t affected by class imbalances because it considers both True Positives and False Positives. The True Positive Rate (TPR) captures all the instances in which our model said ‘Drink this wine’ and it was, in fact, a wine we would want to drink; False Positive Rate (FPR) captures instances in which our model said ‘Drink this Wine’ but it was actually a wine that we would not want to drink. Obtaining more TPRs and fewer FPRs will move the AUC closer to one, which means our model is improving. Hopefully, this clarifies the rationale for using AUC relative to accuracy. Now let’s get back to the original question.</p>
+</div>
+<div id="adding-irrelevant-predictors" class="section level3">
+<h3>Adding Irrelevant Predictors</h3>
+<p>A little disclaimer before moving on. There are a number of ways you can reduce the influence of irrelevant features on predictive accuracy, namely <em>regularization</em>. However, we’re interested in which algorithms are least susceptible to modeling the noise associated with an irrelevant predictor variable without any additional regularization or parameter optimization. Accordingly, we’ll sample the irrelevant predictors from a normal distribution with a mean of zero and a standard deviation of one. Each iteration adds an additional 100 irrelevant predictors across a total of 20 iterations. All of the algorithms use the default parameters that come with the <code>h2o</code> library.</p>
+<pre class="r"><code>n_noise_vars = seq(100, 2000, length.out = 20)
+
+for(i in n_noise_vars){
+  print(i)
+  temp_noise_df_train = data.frame(placeholder = rep(NA, nrow(df_split$train)))
+  temp_noise_df_test = data.frame(placeholder = rep(NA, nrow(df_split$test)))
+  
+  # add in i irrelevant predictors to train and test
+  for(j in 1:i){
+    temp_noise_df_train = cbind(temp_noise_df_train, 
+                                data.frame(noise.var = rnorm(nrow(df_split$train), 
+                                                           0, 
+                                                           1)))
+    temp_noise_df_test = cbind(temp_noise_df_test, 
+                               data.frame(noise.var = rnorm(nrow(df_split$test), 
+                                                           0, 
+                                                           1)))
+  }
+  # format names of irrelevant variables
+  temp_noise_df_train = temp_noise_df_train[,2:dim(temp_noise_df_train)[2]]
+  names(temp_noise_df_train) = gsub(&quot;\\.&quot;, &quot;&quot;, names(temp_noise_df_train))
+  temp_noise_df_train = as.h2o(cbind(temp_noise_df_train,
+                              df_split$train))
+  
+  temp_noise_df_test = temp_noise_df_test[,2:dim(temp_noise_df_test)[2]]
+  names(temp_noise_df_test) = gsub(&quot;\\.&quot;, &quot;&quot;, names(temp_noise_df_test))
+  temp_noise_df_test = cbind(temp_noise_df_test,
+                             df_split$test)
+  
+  x_var = setdiff(names(temp_noise_df_train),y_var)
+
+  gbm_fit = h2o.gbm(x = x_var, 
+                    y = y_var,
+                    distribution = &quot;bernoulli&quot;,
+                    training_frame = temp_noise_df_train,
+                    stopping_rounds = 3,
+                    stopping_metric = &quot;AUC&quot;)
+  
+  rf_fit = h2o.randomForest(x = x_var,
+                            y = y_var,
+                            training_frame = temp_noise_df_train,
+                            stopping_rounds = 3,
+                            stopping_metric = &quot;AUC&quot;)
+  
+  nn_fit = h2o.deeplearning(x = x_var,
+                            y = y_var,
+                            training_frame = temp_noise_df_train,
+                            stopping_rounds = 3,
+                            stopping_metric = &quot;AUC&quot;)
+  
+  glm_fit = h2o.glm(x = x_var,
+                    y = y_var,
+                    family = &quot;binomial&quot;,
+                    training_frame = temp_noise_df_train)
+  
+  temp_noise_df_test = as.h2o(temp_noise_df_test)
+  
+  gbm_auc = h2o.auc(h2o.performance(gbm_fit, newdata = temp_noise_df_test))
+  rf_auc = h2o.auc(h2o.performance(rf_fit, newdata = temp_noise_df_test))
+  nn_auc = h2o.auc(h2o.performance(nn_fit, newdata = temp_noise_df_test))
+  glm_auc = h2o.auc(h2o.performance(glm_fit, newdata = temp_noise_df_test))
+  
+  auc_df = rbind(auc_df,
+                 data.frame(n_noise_vars = i,
+                 method = c(&#39;gbm&#39;, &#39;rf&#39;, &#39;nn&#39;, &#39;glm&#39;),
+                 AUC = c(gbm_auc, rf_auc, nn_auc, glm_auc))) 
+}</code></pre>
+<p>And now let’s plot the results.</p>
+<pre class="r"><code>ggplot(auc_df, aes(x = n_noise_vars, 
+                   y = AUC, 
+                   color = method)) + 
+         geom_point(size = 2) + 
+  stat_smooth(span = 1.75, 
+              se = FALSE, 
+              size = 2) + 
+  theme_bw() + 
+  my_plot_theme() + 
+  ylab(&quot;AUC&quot;) + 
+  xlab(&quot;N Noise Variables&quot;)</code></pre>
+<p><img src="/post/feature_selection_wine_files/figure-html/unnamed-chunk-19-1.png" width="960" /></p>
+<p>A few initial observations:</p>
+<ul>
+<li><strong>AUC for all methods, with the exception of GLM, decreased as the number of irrelevant predictors in the model increased</strong></li>
+<li><strong>GBM is the most robust against the ill-effects of irrelevant predictors, while NN was the most susceptible</strong></li>
+</ul>
+<p>Although we can’t generalize these outcomes to every situation, they do align with my experience. In fact, one of the reasons I like GBM is that it tends to ignore irrelevant predictors during modeling. Neural networks are extremely powerful and with the right tuning/regularization will often outperform any of the methods outlined here. However, they are susceptible to overfitting because of their flexibility, which leads to noise being leveraged as signal during the model building process. This goes to show that pre-processing and feature selection is an important part of the model building process if you are dealing with lots of potential features. Beyond reducing the training time, pruning irrelevant features can vastly improve model performance. As illustrated above, including irrelevant features can wreak havoc on your model when using methods with lots of flexible parameters. It would be interesting to see how these results change if we added some regularization measures to protect against overfitting. For example, one way to reduce overfitting with Random Forest is to limit the maximum depth of a tree (i.e., each tree can only have a single split instead of multiple splits). Or for Neural Networks L2 regularization can be used, which discourages weight vectors in the network from becoming too large. If you try any of these approaches, I’d love to hear how it goes!</p>
+</div>

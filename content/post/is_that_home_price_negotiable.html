@@ -1,0 +1,810 @@
+---
+title: "Is that Home Price Negotiable?"
+author: "Mark LeBoeuf"
+date: '2017-05-14T21:13:14-05:00'
+summary: This post covers how quantile regression and prediction intervals can be
+  used to determine how much 'wiggle room' there is for a home's price.
+tags: ["R", "Quantile Regression", "Prediction Interval"]
+categories: ["R", "Quantile Regression", "Prediction Interval"]
+---
+
+
+
+<p><img src="prediction_interval_images/big_house.png" width="800px" height="800px" /></p>
+<div id="overview" class="section level3">
+<h3>Overview</h3>
+<p>Buying a home is a big decision, and negotiating the final sales price is a central part of that decision. If your offer is too low, it might be ignored. If it is too high, you end up spending more than required. Obviously, both these scenarios should be avoided, so how do you know if there is room to negotiate? One way is to not only estimate the expected price of a potential home relative to the asking price but also to quantify the certainty surrounding that estimate. Popular real-estate websites, such as <a href="www.redfin.com">Redfin</a> or <a href="www.zillow.com">Zillow</a>, provide the first part of this equation but do not provide any indication as to the certainty surrounding their estimate of a home’s value. A negotiable price would have the following two characteristics:</p>
+<ul>
+<li>An estimated value below the asking price</li>
+<li>A high level of confidence in the accuracy of the estimated value</li>
+</ul>
+<p>In this post, I’ll cover how to generate insights on both fronts using the Boston Housing Dataset. However, before diving into the code, let’s briefly review some key concepts.</p>
+</div>
+<div id="confidence-prediction-intervals" class="section level3">
+<h3>Confidence &amp; Prediction Intervals</h3>
+<p>These two terms are often used interchangeably but they are quite different. In this case, we want to estimate a home’s sales price as a function of how many rooms are in the house. Confidence intervals capture uncertainty around a parameter estimate (e.g., the average increase in price for each additional room). If we were to repeatedly take samples of houses, measure their sales price and number of rooms, and calculate a different regression equation for each sample, then 95% of the confidence intervals generated from each regression should contain the true parameter (i.e., the increase in a home’s value resulting from each additional room).</p>
+<p>Prediction intervals take the uncertainty of parameter estimates into account as well. But they also consider the uncertainty around trying to predict the value of an unseen, single observation (variability of individual observations around the parameter). Therefore, prediction intervals are always wider than confidence intervals – because we are considering more sources of uncertainty. When purchasing a home, we aren’t particularly interested in the average price of all homes with, say, eight rooms. What we want to know is the price for that eight-room, English Tudor Revival home with the old Oak tree in the front yard and 1980s style Jacuzzi in the backyard that’s for sale up the street. To answer that question, you’ll need to use a prediction interval.</p>
+<p>With these differences in mind, let’s see how prediction intervals are used in practice. Imagine you are buying a home. You have actual historical sales data associated with various features of a home, such as the number rooms or commute time to major employment centers. You have the same data for homes you want to purchase, but instead of a sales price, you have an asking price. To recreate this situation, we’ll do a 70-30 split to create our training and test sets, respectively, using the Boston Housing dataset. We’ll implement cross-validation on the training set to get an idea of how well our prediction interval methodology will perform on new, unseen data. Finally, we’ll identify all the homes where an offer below the listing price has a high chance of being accepted. Let’s get started and pull all the data we’ll need into R.</p>
+<pre class="r"><code>libs = c(&#39;randomForest&#39;, &#39;dplyr&#39;, &#39;data.table&#39;, 
+         &#39;knitr&#39;, &#39;ggplot2&#39;, &#39;kableExtra&#39;,
+         &#39;car&#39;, &#39;forcats&#39;, &#39;lazyeval&#39;, 
+         &#39;broom&#39;, &#39;VSURF&#39;,&#39;quantregForest&#39;
+         )
+
+lapply(libs, require, character.only = TRUE)
+
+housing_data = fread(&quot;https://archive.ics.uci.edu/ml/machine-learning-databases/housing/housing.data&quot;,
+                      data.table = FALSE)
+
+names(housing_data) = c(&#39;crim&#39;, &#39;zn&#39;, &#39;indus&#39;,
+                       &#39;chas&#39;, &#39;nox&#39;, &#39;rm&#39;, &#39;age&#39;,
+                       &#39;dis&#39;, &#39;rad&#39;, &#39;tax&#39;, &#39;ptratio&#39;,
+                       &#39;b&#39;, &#39;lstat&#39;, &#39;sales_price&#39;)
+# covert outcome variable to 100K increments
+housing_data$sales_price = housing_data$sales_price * 10e3
+set.seed(123)
+pct_train = 0.70
+
+train_indices = sample.int(n = nrow(housing_data), 
+                           size = floor(pct_train * nrow(housing_data)), 
+                           replace = FALSE)
+
+train_df = housing_data[train_indices,]
+test_df = housing_data[-train_indices,] %&gt;% 
+          dplyr::rename(asking_price = sales_price)</code></pre>
+<p>As always, it’s a good idea to check out a few rows in the data.</p>
+<div style="border: 1px solid #ddd; padding: 5px; overflow-y: scroll; height:410px; overflow-x: scroll; width:720px; ">
+<table class="table table-striped table-hover" style="margin-left: auto; margin-right: auto;">
+<thead>
+<tr>
+<th style="text-align:left;">
+</th>
+<th style="text-align:center;">
+crim
+</th>
+<th style="text-align:center;">
+zn
+</th>
+<th style="text-align:center;">
+indus
+</th>
+<th style="text-align:center;">
+chas
+</th>
+<th style="text-align:center;">
+nox
+</th>
+<th style="text-align:center;">
+rm
+</th>
+<th style="text-align:center;">
+age
+</th>
+<th style="text-align:center;">
+dis
+</th>
+<th style="text-align:center;">
+rad
+</th>
+<th style="text-align:center;">
+tax
+</th>
+<th style="text-align:center;">
+ptratio
+</th>
+<th style="text-align:center;">
+b
+</th>
+<th style="text-align:center;">
+lstat
+</th>
+<th style="text-align:center;">
+sales_price
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left;">
+146
+</td>
+<td style="text-align:center;">
+2.37934
+</td>
+<td style="text-align:center;">
+0
+</td>
+<td style="text-align:center;">
+19.58
+</td>
+<td style="text-align:center;">
+0
+</td>
+<td style="text-align:center;">
+0.871
+</td>
+<td style="text-align:center;">
+6.130
+</td>
+<td style="text-align:center;">
+100.0
+</td>
+<td style="text-align:center;">
+1.4191
+</td>
+<td style="text-align:center;">
+5
+</td>
+<td style="text-align:center;">
+403
+</td>
+<td style="text-align:center;">
+14.7
+</td>
+<td style="text-align:center;">
+172.91
+</td>
+<td style="text-align:center;">
+27.80
+</td>
+<td style="text-align:center;">
+138000
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+399
+</td>
+<td style="text-align:center;">
+38.35180
+</td>
+<td style="text-align:center;">
+0
+</td>
+<td style="text-align:center;">
+18.10
+</td>
+<td style="text-align:center;">
+0
+</td>
+<td style="text-align:center;">
+0.693
+</td>
+<td style="text-align:center;">
+5.453
+</td>
+<td style="text-align:center;">
+100.0
+</td>
+<td style="text-align:center;">
+1.4896
+</td>
+<td style="text-align:center;">
+24
+</td>
+<td style="text-align:center;">
+666
+</td>
+<td style="text-align:center;">
+20.2
+</td>
+<td style="text-align:center;">
+396.90
+</td>
+<td style="text-align:center;">
+30.59
+</td>
+<td style="text-align:center;">
+50000
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+207
+</td>
+<td style="text-align:center;">
+0.22969
+</td>
+<td style="text-align:center;">
+0
+</td>
+<td style="text-align:center;">
+10.59
+</td>
+<td style="text-align:center;">
+0
+</td>
+<td style="text-align:center;">
+0.489
+</td>
+<td style="text-align:center;">
+6.326
+</td>
+<td style="text-align:center;">
+52.5
+</td>
+<td style="text-align:center;">
+4.3549
+</td>
+<td style="text-align:center;">
+4
+</td>
+<td style="text-align:center;">
+277
+</td>
+<td style="text-align:center;">
+18.6
+</td>
+<td style="text-align:center;">
+394.87
+</td>
+<td style="text-align:center;">
+10.97
+</td>
+<td style="text-align:center;">
+244000
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+445
+</td>
+<td style="text-align:center;">
+12.80230
+</td>
+<td style="text-align:center;">
+0
+</td>
+<td style="text-align:center;">
+18.10
+</td>
+<td style="text-align:center;">
+0
+</td>
+<td style="text-align:center;">
+0.740
+</td>
+<td style="text-align:center;">
+5.854
+</td>
+<td style="text-align:center;">
+96.6
+</td>
+<td style="text-align:center;">
+1.8956
+</td>
+<td style="text-align:center;">
+24
+</td>
+<td style="text-align:center;">
+666
+</td>
+<td style="text-align:center;">
+20.2
+</td>
+<td style="text-align:center;">
+240.52
+</td>
+<td style="text-align:center;">
+23.79
+</td>
+<td style="text-align:center;">
+108000
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+473
+</td>
+<td style="text-align:center;">
+3.56868
+</td>
+<td style="text-align:center;">
+0
+</td>
+<td style="text-align:center;">
+18.10
+</td>
+<td style="text-align:center;">
+0
+</td>
+<td style="text-align:center;">
+0.580
+</td>
+<td style="text-align:center;">
+6.437
+</td>
+<td style="text-align:center;">
+75.0
+</td>
+<td style="text-align:center;">
+2.8965
+</td>
+<td style="text-align:center;">
+24
+</td>
+<td style="text-align:center;">
+666
+</td>
+<td style="text-align:center;">
+20.2
+</td>
+<td style="text-align:center;">
+393.37
+</td>
+<td style="text-align:center;">
+14.36
+</td>
+<td style="text-align:center;">
+232000
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+23
+</td>
+<td style="text-align:center;">
+1.23247
+</td>
+<td style="text-align:center;">
+0
+</td>
+<td style="text-align:center;">
+8.14
+</td>
+<td style="text-align:center;">
+0
+</td>
+<td style="text-align:center;">
+0.538
+</td>
+<td style="text-align:center;">
+6.142
+</td>
+<td style="text-align:center;">
+91.7
+</td>
+<td style="text-align:center;">
+3.9769
+</td>
+<td style="text-align:center;">
+4
+</td>
+<td style="text-align:center;">
+307
+</td>
+<td style="text-align:center;">
+21.0
+</td>
+<td style="text-align:center;">
+396.90
+</td>
+<td style="text-align:center;">
+18.72
+</td>
+<td style="text-align:center;">
+152000
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+265
+</td>
+<td style="text-align:center;">
+0.55007
+</td>
+<td style="text-align:center;">
+20
+</td>
+<td style="text-align:center;">
+3.97
+</td>
+<td style="text-align:center;">
+0
+</td>
+<td style="text-align:center;">
+0.647
+</td>
+<td style="text-align:center;">
+7.206
+</td>
+<td style="text-align:center;">
+91.6
+</td>
+<td style="text-align:center;">
+1.9301
+</td>
+<td style="text-align:center;">
+5
+</td>
+<td style="text-align:center;">
+264
+</td>
+<td style="text-align:center;">
+13.0
+</td>
+<td style="text-align:center;">
+387.89
+</td>
+<td style="text-align:center;">
+8.10
+</td>
+<td style="text-align:center;">
+365000
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+446
+</td>
+<td style="text-align:center;">
+10.67180
+</td>
+<td style="text-align:center;">
+0
+</td>
+<td style="text-align:center;">
+18.10
+</td>
+<td style="text-align:center;">
+0
+</td>
+<td style="text-align:center;">
+0.740
+</td>
+<td style="text-align:center;">
+6.459
+</td>
+<td style="text-align:center;">
+94.8
+</td>
+<td style="text-align:center;">
+1.9879
+</td>
+<td style="text-align:center;">
+24
+</td>
+<td style="text-align:center;">
+666
+</td>
+<td style="text-align:center;">
+20.2
+</td>
+<td style="text-align:center;">
+43.06
+</td>
+<td style="text-align:center;">
+23.98
+</td>
+<td style="text-align:center;">
+118000
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+275
+</td>
+<td style="text-align:center;">
+0.05644
+</td>
+<td style="text-align:center;">
+40
+</td>
+<td style="text-align:center;">
+6.41
+</td>
+<td style="text-align:center;">
+1
+</td>
+<td style="text-align:center;">
+0.447
+</td>
+<td style="text-align:center;">
+6.758
+</td>
+<td style="text-align:center;">
+32.9
+</td>
+<td style="text-align:center;">
+4.0776
+</td>
+<td style="text-align:center;">
+4
+</td>
+<td style="text-align:center;">
+254
+</td>
+<td style="text-align:center;">
+17.6
+</td>
+<td style="text-align:center;">
+396.90
+</td>
+<td style="text-align:center;">
+3.53
+</td>
+<td style="text-align:center;">
+324000
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+227
+</td>
+<td style="text-align:center;">
+0.38214
+</td>
+<td style="text-align:center;">
+0
+</td>
+<td style="text-align:center;">
+6.20
+</td>
+<td style="text-align:center;">
+0
+</td>
+<td style="text-align:center;">
+0.504
+</td>
+<td style="text-align:center;">
+8.040
+</td>
+<td style="text-align:center;">
+86.5
+</td>
+<td style="text-align:center;">
+3.2157
+</td>
+<td style="text-align:center;">
+8
+</td>
+<td style="text-align:center;">
+307
+</td>
+<td style="text-align:center;">
+17.4
+</td>
+<td style="text-align:center;">
+387.38
+</td>
+<td style="text-align:center;">
+3.13
+</td>
+<td style="text-align:center;">
+376000
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Great success! Each of the fields represents some attribute of the home For example, <code>rm</code> is the number of rooms in the house, and <code>crim</code> is the per capita crime rate per town (see <a href="https://www.cs.toronto.edu/~delve/data/boston/bostonDetail.html">here</a> for more detail). We are now ready to build a model, and the first step is to understand which features are essential to our prediction accuracy. We’ll leverage the <code>VSURF</code> package, or <em>Variable Selection Using Random Forest</em>, to do variable selection, ensuring that only features that matter enter into the model. This is achieved in a stepwise fashion, where the Out of Bag (OOB) errors are compared between models that include/exclude one variable. If a big reduction in the average OOB error occurs when a variable is included, then we assume that the variable is important.</p>
+<pre class="r"><code>set.seed(123)
+vsurf_fit = VSURF(x = train_df[,1:13],
+            y = train_df[,14],
+            parallel = TRUE,
+            ncores = 8)</code></pre>
+<p>The following four variables contributed significantly to the selling price of a home in Boston:</p>
+<ul>
+<li><strong>lstat - % lower status of the population</strong></li>
+<li><strong>rm - number of rooms</strong></li>
+<li><strong>nox - nitric oxides concentration (not sure if this is good or bad)</strong></li>
+<li><strong>dis - weighted distance to five Boston employment centers</strong></li>
+</ul>
+<p>Let’s reduce our training set to only include these four features.</p>
+<pre class="r"><code>train_df = train_df[c(names(train_df)[vsurf_fit$varselect.pred],
+                       &#39;sales_price&#39;)]
+x_var = setdiff(names(train_df), &#39;sales_price&#39;)</code></pre>
+<p>Now that we have our new, slim data set, we’ll move on to the modeling part. In this case, we’ll use a technique called <code>Quantile Regression</code> or QR. For those unfamiliar, QR works by differentially weighting errors during the model fitting process. It captures the relationship between our inputs and a specific quantile (i.e., percentile) of our output. For example, if the goal is to understand the relationship between X and Y at the 90th percentile of Y, 10% of the errors should be positive and 90% negative to minimize our loss function (e.g., MAE, MSE). This is especially useful for creating prediction intervals, while also providing a point estimate, in this case, the median (i.e., the 50th percentile). Additionally, it is agnostic to the statistical method being used; multiple regression is the most common form of quantile regression, but GBM, Random Forest, which is what will be used here, and even Neural Networks can be used to do QR.</p>
+<p>With that in mind, let’s move on to the actual modeling part. First, we’ll determine how well we can explain a home’s sale price via the <code>Mean Absolute Error</code> (MAE). Second, we’ll validate our prediction intervals. An 80% prediction interval will be used, so at least 80% of observations should fall within the bounds of an interval – a metric referred to as <code>coverage</code> or <code>tolerance</code>. We’ll test both metrics via 5-fold cross-validation.</p>
+<pre class="r"><code>set.seed(123)
+# add row index
+train_df$row_index = 1:nrow(train_df)
+# shuffle rows to randomized input order
+train_df = train_df[sample(nrow(train_df)),]
+# specify N folds
+n_fold = 5
+start_index = 1
+end_index = floor(nrow(train_df)/n_fold)
+increment = end_index
+cv_df = data.frame(NULL)
+for(i in 1:n_fold){
+  temp_train_df = train_df %&gt;% 
+                  filter(!(row_index %in% start_index:end_index)) %&gt;% 
+                  select(-row_index)
+  
+  temp_validation_df = train_df %&gt;% 
+                  filter(row_index %in% start_index:end_index) %&gt;% 
+                  select(-row_index)
+  
+  cv_pred = tidy(
+                  predict(quantregForest(x = temp_train_df[,1:(dim(temp_train_df)[2] - 1)],
+                                         y = temp_train_df[,dim(temp_train_df)[2]],
+                                         ntree = 500
+                                        ),
+                          temp_validation_df,
+                          what = c(0.1, 0.5, 0.9)
+                          )
+                  ) %&gt;% 
+             mutate(sales_price = temp_validation_df$sales_price) %&gt;% 
+             rename(lwr = quantile..0.1,
+                    upr = quantile..0.9,
+                    predicted_price = quantile..0.5
+                    ) %&gt;% 
+             mutate(residual = sales_price - predicted_price,
+                    coverage = ifelse(sales_price &gt; lwr &amp; sales_price &lt; upr, 1, 0)
+                    )
+  cv_df = bind_rows(cv_df,
+                    data.frame(mean_abs_err = mean(abs(cv_pred$residual)),
+                               coverage = sum(cv_pred$coverage)/nrow(cv_pred) * 100,
+                               fold = i
+                              )
+                    )
+  start_index = end_index
+  end_index = end_index + increment
+  if(end_index &gt; nrow(train_df)){
+    break
+  }
+}</code></pre>
+<div style="border: 1px solid #ddd; padding: 5px; overflow-y: scroll; height:310px; overflow-x: scroll; width:720px; ">
+<table class="table table-striped table-hover" style="margin-left: auto; margin-right: auto;">
+<thead>
+<tr>
+<th style="text-align:center;">
+mean_abs_err
+</th>
+<th style="text-align:center;">
+coverage
+</th>
+<th style="text-align:center;">
+fold
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center;">
+21192.86
+</td>
+<td style="text-align:center;">
+87.14286
+</td>
+<td style="text-align:center;">
+1
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+28345.07
+</td>
+<td style="text-align:center;">
+84.50704
+</td>
+<td style="text-align:center;">
+2
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+25563.38
+</td>
+<td style="text-align:center;">
+83.09859
+</td>
+<td style="text-align:center;">
+3
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+23119.72
+</td>
+<td style="text-align:center;">
+90.14085
+</td>
+<td style="text-align:center;">
+4
+</td>
+</tr>
+<tr>
+<td style="text-align:center;">
+25654.93
+</td>
+<td style="text-align:center;">
+81.69014
+</td>
+<td style="text-align:center;">
+5
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Overall the model and prediction intervals performed well, at least well enough to the point where I’d feel comfortable negotiating based on the output. Let’s put our new-found knowledge to work! First, to make this example more realistic, we’ll apply a few constraints. For example, I want a house with at least six rooms, within an average distance of four miles to all major working areas (because sitting in traffic is no fun), and I don’t want to spend any more than 300K. Let’s filter the test data set to only include homes that meet these criteria.</p>
+<pre class="r"><code>rm_threshold = 6
+dis_threshold = 4
+price_threshold = 300000
+test_df = test_df %&gt;% 
+          select(c(x_var, &#39;asking_price&#39;)) %&gt;% 
+          filter(rm &gt;= rm_threshold &amp; 
+                 dis &lt;= dis_threshold &amp;
+                 asking_price &lt;= price_threshold 
+                   )</code></pre>
+<p>A total of 48 homes remain. Of these homes, which could we negotiate the sale price? Let’s examine the output from our final model and visualize where the opportunities exist.</p>
+<pre class="r"><code>qrf_fit = quantregForest(x=train_df[,1:4], 
+                         y = train_df[,5], 
+                         ntree = 1000)
+
+qrf_quantile = predict(qrf_fit, 
+                        test_df, 
+                        what=c(0.1, 0.5, 0.9)) %&gt;% 
+                data.frame() %&gt;% 
+                rename(predicted_price = quantile..0.5,
+                       lwr = quantile..0.1,
+                       upr = quantile..0.9) %&gt;% 
+                mutate(asking_price = test_df$asking_price) %&gt;% 
+                mutate(coverage = ifelse(asking_price &lt;= upr &amp; asking_price &gt;= lwr, 
+                                         1, 
+                                         0),
+                       `PI Range` = upr - lwr,
+                       residual = asking_price - predicted_price
+                       ) %&gt;% 
+                mutate(Opportunity = ifelse(residual &lt; 0, 
+                                            &quot;underpriced&quot;, 
+                                            &quot;overpriced&quot;)) %&gt;% 
+                filter(`PI Range` &lt;= 90000)</code></pre>
+<pre class="r"><code>my_plot_theme = function(){
+    font_family = &quot;Helvetica&quot;
+    font_face = &quot;bold&quot;
+    return(theme(
+    axis.text.x = element_text(size = 18, face = font_face, family = font_family),
+    axis.text.y = element_text(size = 18, face = font_face, family = font_family),
+    axis.title.x = element_text(size = 20, face = font_face, family = font_family),
+    axis.title.y = element_text(size = 20, face = font_face, family = font_family),
+    strip.text.y = element_text(size = 18, face = font_face, family = font_family),
+    plot.title = element_text(size = 18, face = font_face, family = font_family),
+    legend.position = &quot;top&quot;,
+    legend.title = element_text(size = 16,
+    face = font_face,
+    family = font_family),
+    legend.text = element_text(size = 14,
+    face = font_face,
+    family = font_family)
+))
+}
+qrf_quantile %&gt;% 
+  mutate(asking_price = asking_price/1e3,
+         predicted_price = predicted_price/1e3,
+         `PI Range` = `PI Range`/1e3,
+         lwr = lwr/1e3,
+         upr = upr/1e3
+         ) %&gt;% 
+ggplot(aes(x = asking_price, 
+                          y = predicted_price, 
+                          color = Opportunity)) + 
+  theme_bw() + 
+  geom_point(aes(size = `PI Range`)) + 
+  geom_errorbar(aes(ymin = lwr, ymax = upr)) + 
+  geom_abline(intercept = 0, slope = 1, 
+              color = &quot;black&quot;, size = 2, 
+              linetype = &quot;solid&quot;,
+              alpha = 0.5
+              ) + 
+  xlab(&quot;Asking Price (K)&quot;) + ylab(&quot;Predicted Price (K)&quot;) + 
+  my_plot_theme() +  
+  xlim(0, price_threshold/1e3 + 30) + ylim(0, price_threshold/1e3 + 30) + 
+  annotate(&quot;segment&quot;, 
+           x = 260, 
+           xend = 285, 
+           y = 200, 
+           yend = 228, 
+           colour = &quot;black&quot;, 
+           size = 2, 
+           arrow = arrow(),
+           alpha = 0.6
+           )</code></pre>
+<p><img src="/post/is_that_home_price_negotiable_files/figure-html/unnamed-chunk-12-1.png" width="960" /> Each point represents a home. All points below the diagonal line are overpriced homes (i.e., the asking price is above the predicted price), while those above the diagonal line are underpriced. Each of the points is sized according to the width of its prediction interval, such that smaller points have narrower intervals. The arrow identifies a potential home that we should feel comfortable negotiating on price because it not only is overpriced but also has a relatively narrow prediction interval. When both features are present, making an offer for less than the asking price should result in an acceptance more frequently than the points above of the line or those with wider prediction intervals. This is information we can use to decide when to make a purchase, continue negotiating, or simply walk away from the house.</p>
+</div>
+<div id="concluding-remarks" class="section level3">
+<h3>Concluding Remarks</h3>
+<p>This post outlined a framework for identifying opportunities where an offer lower than the asking price would likely be accepted when purchasing a home. However, this framework could be used in any decision-making context where uncertainty is a major factor in choosing a course of action. For example, imagine we were predicting demand for a new product instead of home prices. If our demand forecast was much larger than production numbers, and the accompanying prediction interval was small, then we could recommend an increase in production numbers to avoid lost sales. I’d love to hear about frameworks/techniques that you use to deal with these types of issues, so please feel free to chime in below!</p>
+</div>
