@@ -234,9 +234,19 @@ qrf_quantile = predict(qrf_fit,
                                             "underpriced", 
                                             "overpriced")) %>% 
                 filter(`PI Range` <= 90000)
+
+
+qrf_plot_input = qrf_quantile %>% 
+  mutate(asking_price = asking_price/1e3,
+         predicted_price = predicted_price/1e3,
+         `PI Range` = `PI Range`/1e3,
+         lwr = lwr/1e3,
+         upr = upr/1e3
+         )
 ```
 
-```{r, fig.width = 10, fig.height = 8, message=FALSE, warning=FALSE}
+```{r, message=FALSE, warning=FALSE}
+# custom plotting theme
 my_plot_theme = function(){
     font_family = "Helvetica"
     font_face = "bold"
@@ -256,14 +266,11 @@ my_plot_theme = function(){
     family = font_family)
 ))
 }
-qrf_quantile %>% 
-  mutate(asking_price = asking_price/1e3,
-         predicted_price = predicted_price/1e3,
-         `PI Range` = `PI Range`/1e3,
-         lwr = lwr/1e3,
-         upr = upr/1e3
-         ) %>% 
-ggplot(aes(x = asking_price, 
+
+```
+
+```{r, fig.width = 10, fig.height = 8}
+ggplot(qrf_plot_input, aes(x = asking_price, 
                           y = predicted_price, 
                           color = Opportunity)) + 
   theme_bw() + 
@@ -288,8 +295,8 @@ ggplot(aes(x = asking_price,
            alpha = 0.6
            )
 
-  
 ```
+
 Each point represents a home. All points below the diagonal line are overpriced homes (i.e., the asking price is above the predicted price), while those above the diagonal line are underpriced. Each of the points is sized according to the width of its prediction interval, such that smaller points have narrower intervals. The arrow identifies a potential home that we should feel comfortable negotiating on price because it not only is overpriced but also has a relatively narrow prediction interval. When both features are present, making an offer for less than the asking price should result in an acceptance more frequently than the points above of the line or those with wider prediction intervals. This is information we can use to decide when to make a purchase, continue negotiating, or simply walk away from the house. 
 
 ### Concluding Remarks
