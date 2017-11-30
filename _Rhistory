@@ -1,135 +1,297 @@
-y = start_lat,
-label = drop_off_order
-))
-help("geom_label")
-nyc_map +  geom_path(aes(x = start_lon, y = start_lat),
-data = small_df,
-size = 2) +
-geom_label(data = small_df, aes(x = start_lon,
-y = start_lat,
-label = drop_off_order
-),
-label.padding = 0.1)
-nyc_map +  geom_path(aes(x = start_lon, y = start_lat),
-data = small_df,
-size = 2) +
-geom_text()
-head(small_df)
-row.names(small_df) = small_df$drop_off_order
-nyc_map +  geom_path(aes(x = start_lon, y = start_lat),
-data = small_df,
-size = 2) +
-geom_text()
-small_df = head(travel_path_df, 40) %>%
-mutate(drop_off_order = 1:n())
-# start_lat
-nyc_map +  geom_path(aes(x = start_lon, y = start_lat),
-data = small_df,
-size = 2) +
-geom_label(data = small_df, aes(x = start_lon,
-y = start_lat,
-label = drop_off_order
-),
-label.padding = 0.1)
-nyc_map +  geom_path(aes(x = start_lon, y = start_lat),
-data = small_df,
-size = 2) +
-geom_label(data = small_df, aes(x = start_lon,
-y = start_lat,
-label = drop_off_order
-))
-small_df = head(travel_path_df, 80) %>%
-mutate(drop_off_order = 1:n())
-nyc_map +  geom_path(aes(x = start_lon, y = start_lat),
-data = small_df,
-size = 2) +
-geom_label(data = small_df, aes(x = start_lon,
-y = start_lat,
-label = drop_off_order
-))
-leaflet(data = lat_long_man) %>%
-setView(lng = -74.0060, lat = 40.7128, zoom = 12) %>%
-addProviderTiles(providers$Stamen.Toner) %>%
-addCircleMarkers(~long, ~lat,
-color = ~pal(truck),
-radius = 3,
-stroke = TRUE,
-fillOpacity = 0.5,
-popup = ~as.character(paste(lat, long, zip_code, sep = " | "))
-) %>%
-addPopups(lng = -73.998247, lat = 40.723284, content,
-options = popupOptions(closeButton = FALSE)
-)
-truck_1 = lat_long_man %>%
-filter(truck == 'truck1') %>%
-mutate(row_index = 1:n())
-truck_1
-leaflet(data = truck_1) %>%
-setView(lng = -74.0060, lat = 40.7128, zoom = 12) %>%
-addProviderTiles(providers$Stamen.Toner) %>%
-addCircleMarkers(~long, ~lat,
-color = ~pal(truck),
-radius = 3,
-stroke = TRUE,
-fillOpacity = 0.5,
-popup = ~as.character(paste(lat, long, zip_code, sep = " | "))
-) %>%
-addPopups(lng = -73.998247, lat = 40.723284, content,
-options = popupOptions(closeButton = FALSE)
-)
-truck_1_small = truck_1 %>%
-select(row_index, lat, long) %>%
-rename(name = row_index,
-lon = long)
-truck_1_small = bind_rows(data.frame(name = 0,
-lat = start_lat,
-lon = start_lon
-),
-truck_1_small
-)
-# DOWNSAMPLE FOR ILLUSTRATIVE PURPOSES
-truck_1_small = head(truck_1_small, 51)
-head(truck_1_small)
-leaflet(data = truck_1_small) %>%
-setView(lng = -74.0060, lat = 40.7128, zoom = 12) %>%
-addProviderTiles(providers$Stamen.Toner) %>%
-addMarkers(~lon, ~lat, popup = ~as.character(name), label = ~as.character(name)) %>%
-addPopups(lng = -73.998247, lat = 40.723284, content,
-options = popupOptions(closeButton = TRUE)
-)
-man_dist_matrix = GeoDistanceInMetresMatrix(truck_1_small)
-D = as.matrix(man_dist_matrix)
-D
-tourLength <- function(tour, distMatrix) {
-tour <- c(tour, tour[1])
-route <- embed(tour, 2)[,2:1]
-sum(distMatrix[route])
-}
-tspFitness <- function(tour, ...) 1/tourLength(tour, ...)
-# data("eurodist", package = "datasets")
-# attr(eurodist, "Size")
-GA <- ga(type = "permutation", fitness = tspFitness, distMatrix = D,
-min = 1, max = nrow(truck_1_small), popSize = 50, maxiter = 5000,
-run = 500, pmutation = 0.2)
-mds <- cmdscale(man_dist_matrix)
-drive_time_df = data.frame(NULL)
-for(fname in list.files(file.path(base_dir, 'input_data'))){
-if(length(grep("nyc_times_", fname)) == 1){
-temp_df = read.csv(file.path(base_dir, 'input_data', fname))
-drive_time_df = bind_rows(drive_time_df, temp_df)
-}
-}
-head(drive_time_df)
-order_by_hour = data.frame(table(demand_df$order_hour)) %>%
-dplyr::rename(hour_of_day = Var1,
+demand_17 = demand_17 %>%
+arrange(zip_code) %>%
+bind_cols(lat_long_sample_out %>%
+arrange(zip_code) %>%
+select(-zip_code))
+lat_long_sample_df = data.frame(table(demand_17$zip_code)) %>%
+rename(zip_code = Var1,
 order_cnt = Freq) %>%
-mutate(order_pct = order_cnt/nrow(demand_df) * 100)
-ggplot(order_by_hour, aes(x = hour_of_day, y = order_pct)) +
-geom_bar(stat = "identity") +
-theme_bw() +
-my_plot_theme() +
-xlab("Hour of Day") +
-ylab("Percent of Orders Received")
+mutate(zip_code = as.character(zip_code))
+lat_long_sample_out = data.frame(NULL)
+for(i in unique(lat_long_sample_df$zip_code)){
+temp_cnt = lat_long_sample_df %>%
+filter(zip_code == i) %>%
+pull(order_cnt)
+lat_long_sample_out = bind_rows(lat_long_sample_out,
+lat_long_df %>%
+filter(zip_code == i) %>%
+sample_n(temp_cnt)
+)
+}
+lat_long_df
+lat_long_sample_df
+lat_long_sample_df = data.frame(table(demand_17$zip_code)) %>%
+rename(zip_code = Var1,
+order_cnt = Freq) %>%
+mutate(zip_code = as.character(zip_code))
+example <- read.csv("http://web.hku.hk/~bcowling/data/propensity.csv", header=TRUE)
+example
+head(example)
+rhc <- read.csv("http://biostat.mc.vanderbilt.edu/wiki/pub/Main/DataSets/rhc.csv")
+head(rhc)
+head(rhc)
+library(keras)
+library(lime)
+library(tidyquant)
+library(rsample)
+library(recipes)
+library(yardstick)
+library(corrr)
+install.packages('lime')
+library(readr)
+library(dplyr)
+library(data.table)
+outcome_df <- read_csv("http://biostat.mc.vanderbilt.edu/wiki/pub/Main/DataSets/rhc.csv")
+head(outcome_df)
+data_url = "http://biostat.mc.vanderbilt.edu/wiki/pub/Main/DataSets/rhc.csv"
+outcome_df <- read_csv(data_url) %>%
+data.frame()
+head(outcome_df)
+head(outcome_df)
+library(rsample)
+install.packages('rsample')
+library(rsample)
+lat_long_name = 'lat_long_zip.csv'
+# lat_long_df is all geocoded orders placed on Nike.com
+lat_long_df = fread(file.path(base_dir,
+data_dir,
+lat_long_name),
+data.table = FALSE) %>%
+clean_names() %>%
+filter(zip_code %in% manhatten_zips)
+lat_long_sample_df = data.frame(table(demand_17$zip_code)) %>%
+rename(zip_code = Var1,
+order_cnt = Freq) %>%
+mutate(zip_code = as.character(zip_code))
+lat_long_sample_out = data.frame(NULL)
+for(i in unique(lat_long_sample_df$zip_code)){
+temp_cnt = lat_long_sample_df %>%
+filter(zip_code == i) %>%
+pull(order_cnt)
+lat_long_sample_out = bind_rows(lat_long_sample_out,
+lat_long_df %>%
+filter(zip_code == i) %>%
+sample_n(temp_cnt)
+)
+}
+#
+demand_17 = demand_17 %>%
+arrange(zip_code) %>%
+bind_cols(lat_long_sample_out %>%
+arrange(zip_code) %>%
+select(-zip_code))
+lat_long_name = 'lat_long_zip.csv'
+# lat_long_df is all geocoded orders placed on Nike.com
+lat_long_df = fread(file.path(base_dir,
+data_dir,
+lat_long_name),
+data.table = FALSE) %>%
+clean_names() %>%
+filter(zip_code %in% manhatten_zips)
+lat_long_sample_df = data.frame(table(demand_17$zip_code)) %>%
+rename(zip_code = Var1,
+order_cnt = Freq) %>%
+mutate(zip_code = as.character(zip_code))
+head(lat_long_sample_df)
+lat_long_sample_out = data.frame(NULL)
+for(i in unique(lat_long_sample_df$zip_code)){break}
+temp_cnt = lat_long_sample_df %>%
+filter(zip_code == i) %>%
+pull(order_cnt)
+temp_cnt
+head(lat_long_sample_df)
+head(lat_long_df)
+lat_long_sample_out = bind_rows(lat_long_sample_out,
+lat_long_df %>%
+filter(zip_code == i) %>%
+sample_n(temp_cnt)
+lat_long_sample_out = bind_rows(lat_long_sample_out,
+lat_long_df %>%
+filter(zip_code == i) %>%
+sample_n(temp_cnt))
+head(lat_long_df)
+nrow(lat_long_df)
+nrow(demand_17)
+lat_long_sample_out = bind_rows(lat_long_sample_out,
+lat_long_df %>%
+filter(zip_code == i) %>%
+sample_n(temp_cnt, replace = TRUE))
+lat_long_sample_out = data.frame(NULL)
+for(i in unique(lat_long_sample_df$zip_code)){break}
+temp_cnt = lat_long_sample_df %>%
+filter(zip_code == i) %>%
+pull(order_cnt)
+lat_long_sample_out = bind_rows(lat_long_sample_out,
+lat_long_df %>%
+filter(zip_code == i) %>%
+sample_n(temp_cnt, replace = TRUE))
+}
+lat_long_sample_out = data.frame(NULL)
+for(i in unique(lat_long_sample_df$zip_code)){
+temp_cnt = lat_long_sample_df %>%
+filter(zip_code == i) %>%
+pull(order_cnt)
+lat_long_sample_out = bind_rows(lat_long_sample_out,
+lat_long_df %>%
+filter(zip_code == i) %>%
+sample_n(temp_cnt, replace = TRUE))
+}
+head(lat_long_sample_out)
+tail(lat_long_sample_out)
+nrow(lat_long_sample_out)
+nrow(lat_long_sample_out %>% distinct())
+demand_17 = demand_17 %>%
+arrange(zip_code) %>%
+bind_cols(lat_long_sample_out %>%
+arrange(zip_code) %>%
+select(-zip_code))
+head(demand_17)
+ggplot(demand_17, aes(x = long, y = lat)) +
+geom_point()
+demand_17_no = demand_17 %>%
+mutate(lat_scale = as.vector(abs(scale(lat))),
+long_scale = as.vector(abs(scale(long)))) %>%
+filter(lat_scale <= 3 & long_scale <= 3) %>%
+mutate(lat_scale = as.vector(abs(scale(lat))),
+long_scale = as.vector(abs(scale(long)))) %>%
+filter(lat_scale <= 3 & long_scale <= 3)
+head(demand_17_no)
+ggplot(demand_17_no, aes(x = long, y = lat)) +
+geom_point()
+demand_17_no = demand_17 %>%
+mutate(lat_scale = as.vector(abs(scale(lat))),
+long_scale = as.vector(abs(scale(long)))) %>%
+filter(lat_scale <= 3 & long_scale <= 3) %>%
+mutate(lat_scale = as.vector(abs(scale(lat))),
+long_scale = as.vector(abs(scale(long)))) %>%
+filter(lat_scale <= 3 & long_scale <= 3) %>%
+filter(lat >= 40.69)
+ggplot(demand_17_no, aes(x = long, y = lat)) +
+geom_point()
+unique_dates = order(unique(demand_17_no$day_date))
+unique_dates
+unique_dates = unique(demand_17_no$day_date)
+unique_dates
+unique_dates = arrange(unique(demand_17_no$day_date))
+unique_dates = sort(unique(demand_17_no$day_date))
+unique_dates
+for(tmp_date in unique_dates){break}
+temp_day = demand_17_no %>%
+filter(day_date == tmp_date)
+temp_day
+demand_17_no = demand_17 %>%
+mutate(lat_scale = as.vector(abs(scale(lat))),
+long_scale = as.vector(abs(scale(long)))) %>%
+filter(lat_scale <= 3 & long_scale <= 3) %>%
+mutate(lat_scale = as.vector(abs(scale(lat))),
+long_scale = as.vector(abs(scale(long)))) %>%
+filter(lat_scale <= 3 & long_scale <= 3) %>%
+filter(lat >= 40.69) %>%
+select(-lat_scale, -long_scale)
+unique_dates = sort(unique(demand_17_no$day_date))
+for(tmp_date in unique_dates){break}
+temp_day = demand_17_no %>%
+filter(day_date == tmp_date)
+temp_day
+time_cutoff = 19
+temp_day = demand_17_no %>%
+filter(day_date == tmp_date) %>%
+filter(order_hour <= time_cutoff)
+temp_day
+temp_day = demand_17_no %>%
+filter(day_date == tmp_date) %>%
+filter(order_hour <= time_cutoff) %>%
+arrange(order_hour)
+temp_day
+tail(temp_day)
+ggplot(temp_day, aes(x = long, y = lat)) +
+geom_point()
+temp_day = demand_17_no %>%
+filter(day_date == tmp_date) %>%
+filter(order_hour <= time_cutoff) %>%
+arrange(order_hour) %>%
+mutate(lat_scale = as.vector(abs(scale(lat))),
+long_scale = as.vector(abs(scale(long)))) %>%
+filter(lat_scale <= 3 & long_scale <= 3) %>%
+select(-lat_scale, -long_scale)
+ggplot(temp_day, aes(x = long, y = lat)) +
+geom_point()
+demand_17_no = demand_17 %>%
+mutate(lat_scale = as.vector(abs(scale(lat))),
+long_scale = as.vector(abs(scale(long)))) %>%
+filter(lat_scale <= 3 & long_scale <= 3) %>%
+mutate(lat_scale = as.vector(abs(scale(lat))),
+long_scale = as.vector(abs(scale(long)))) %>%
+filter(lat_scale <= 3 & long_scale <= 3) %>%
+filter(lat >= 40.69) %>%
+filter(long >= -74.03)
+unique_dates = sort(unique(demand_17_no$day_date))
+for(tmp_date in unique_dates){break}
+temp_day = demand_17_no %>%
+filter(day_date == tmp_date) %>%
+filter(order_hour <= time_cutoff) %>%
+arrange(order_hour) %>%
+mutate(lat_scale = as.vector(abs(scale(lat))),
+long_scale = as.vector(abs(scale(long)))) %>%
+filter(lat_scale <= 3 & long_scale <= 3) %>%
+select(-lat_scale, -long_scale)
+ggplot(temp_day, aes(x = long, y = lat)) +
+geom_point()
+temp_day = demand_17_no %>%
+filter(day_date == tmp_date) %>%
+filter(order_hour <= time_cutoff) %>%
+arrange(order_hour)
+temp_day
+x <- rbind(matrix(rnorm(100, sd = 0.3), ncol = 2),
+matrix(rnorm(100, mean = 1, sd = 0.3), ncol = 2))
+x
+x[1:3,]
+temp_day
+kmeans_input = temp_day %>%
+select(lat, long)
+kmeans_input
+kmeans_input = bind_rows(kmeans_input,
+data.frame(lat = c(store_1_location[1], store_2_location[1]),
+long = c(store_1_location[2], store_2_location[2])))
+head(kmeans_input)
+blah = kmeans(kmeans_input, centers = kmeans_input[1:2,])
+blah$centers
+head(blah)
+blah$centers
+head(kmeans_input)
+help(kmeans)
+blah = kmeans(kmeans_input, centers = kmeans_input[1:2,], iter.max = 1)
+blah$centers
+head(kmeans_input, 2)
+n_stores = 2
+blah = kmeans(kmeans_input, centers = n_stores)
+blah$cluster
+help(kmeans)
+kmeans_input = temp_day %>%
+select(lat, long)
+kmeans_input = bind_rows(kmeans_input,
+data.frame(lat = c(store_1_location[1], store_2_location[1]),
+long = c(store_1_location[2], store_2_location[2])))
+blah = kmeans(kmeans_input, centers = kmeans_input[1:2,], iter.max = 1)
+blah$cluster
+dist_input = temp_day %>%
+select(lat, long)
+dist_input = bind_rows(
+data.frame(lat = c(store_1_location[1], store_2_location[1]),
+long = c(store_1_location[2], store_2_location[2])),
+dist_input)
+temp_day = demand_17_no %>%
+filter(day_date == tmp_date) %>%
+filter(order_hour <= time_cutoff) %>%
+arrange(order_hour)
+dist_input = temp_day %>%
+select(lat, long)
+dist_input = bind_rows(
+data.frame(lat = c(store_1_location[1], store_2_location[1]),
+long = c(store_1_location[2], store_2_location[2])),
+dist_input)
+dist_input$name = 1:nrow(dist_input)
+dist_input
 # BEGIN FUNCTIONS ---------------------------------------------------------
 ReplaceLowerOrUpperTriangle <- function(m, triangle.to.replace){
 # If triangle.to.replace="lower", replaces the lower triangle of a square matrix with its upper triangle.
@@ -170,331 +332,166 @@ rownames(mat.distances) <- df.geopoints$name
 colnames(mat.distances) <- df.geopoints$name
 return(mat.distances)
 }
-my_plot_theme = function(){
-font_family = "Helvetica"
-font_face = "bold"
-return(theme(
-axis.text.x = element_text(size = 18, face = font_face, family = font_family),
-axis.text.y = element_text(size = 18, face = font_face, family = font_family),
-axis.title.x = element_text(size = 20, face = font_face, family = font_family),
-axis.title.y = element_text(size = 20, face = font_face, family = font_family),
-strip.text.y = element_text(size = 18, face = font_face, family = font_family),
-plot.title = element_text(size = 18, face = font_face, family = font_family),
-legend.position = "top",
-legend.title = element_text(size = 16,
-face = font_face,
-family = font_family),
-legend.text = element_text(size = 14,
-face = font_face,
-family = font_family)
-))
+dist_mat = GeoDistanceInMetresMatrix(dist_input)
+dist_input = temp_day %>%
+select(lat, long)
+dist_input = bind_rows(
+data.frame(lat = c(store_1_location[1], store_2_location[1]),
+long = c(store_1_location[2], store_2_location[2])),
+dist_input) %>%
+dplyr::rename(lon = long)
+dist_input$name = 1:nrow(dist_input)
+dist_mat = GeoDistanceInMetresMatrix(dist_input)
+head(dist_mat)
+colnames(dist_mat)
+dist_mat = GeoDistanceInMetresMatrix(dist_input)[,1:n_stores]
+head(dist_mat)
+for(j in (n_stores + 1):nrow(dist_mat)){
+print(dist_mat[j,])
+break
 }
-# BEGIN FUNCTIONS ---------------------------------------------------------
-ReplaceLowerOrUpperTriangle <- function(m, triangle.to.replace){
-# If triangle.to.replace="lower", replaces the lower triangle of a square matrix with its upper triangle.
-# If triangle.to.replace="upper", replaces the upper triangle of a square matrix with its lower triangle.
-if (nrow(m) != ncol(m)) stop("Supplied matrix must be square.")
-if      (tolower(triangle.to.replace) == "lower") tri <- lower.tri(m)
-else if (tolower(triangle.to.replace) == "upper") tri <- upper.tri(m)
-else stop("triangle.to.replace must be set to 'lower' or 'upper'.")
-m[tri] <- t(m)[tri]
-return(m)
+for(j in (n_stores + 1):nrow(dist_mat)){break}
+j
+print(dist_mat[j,])
+delivery_list = list()
+print(as.vector(dist_mat[j,]))
+print(which.min(as.vector(dist_mat[j,])))
+deliver_from_this_store = which.min(as.vector(dist_mat[j,]))
+deliver_from_this_store = which.min(as.vector(dist_mat[customer_number,]))
+for(customer_number in (n_stores + 1):nrow(dist_mat)){break}
+deliver_from_this_store = which.min(as.vector(dist_mat[customer_number,]))
+delivery_list = list()
+delivery_list[["1"]] = c()
+delivery_list[["2"]] = c()
+delivery_list = list()
+delivery_list[["1"]] = c()
+delivery_list[["2"]] = c()
+for(customer_number in (n_stores + 1):nrow(dist_mat)){
+deliver_from_this_store = which.min(as.vector(dist_mat[customer_number,]))
+delivery_list[[as.character(deliver_from_this_store)]] = customer_number
 }
-GeoDistanceInMetresMatrix <- function(df.geopoints){
-# Returns a matrix (M) of distances between geographic points.
-# M[i,j] = M[j,i] = Distance between (df.geopoints$lat[i], df.geopoints$lon[i]) and
-# (df.geopoints$lat[j], df.geopoints$lon[j]).
-# The row and column names are given by df.geopoints$name.
-GeoDistanceInMetres <- function(g1, g2){
-# Returns a vector of distances. (But if g1$index > g2$index, returns zero.)
-# The 1st value in the returned vector is the distance between g1[[1]] and g2[[1]].
-# The 2nd value in the returned vector is the distance between g1[[2]] and g2[[2]]. Etc.
-# Each g1[[x]] or g2[[x]] must be a list with named elements "index", "lat" and "lon".
-# E.g. g1 <- list(list("index"=1, "lat"=12.1, "lon"=10.1), list("index"=3, "lat"=12.1, "lon"=13.2))
-DistM <- function(g1, g2){
-require("Imap")
-return(ifelse(g1$index > g2$index, 0, gdist(lat.1=g1$lat, lon.1=g1$lon, lat.2=g2$lat, lon.2=g2$lon, units="m")))
+delivery_list
+cust_1_vector = c()
+cust_2_vector = c()
+for(customer_number in (n_stores + 1):nrow(dist_mat)){break}
+deliver_from_this_store = which.min(as.vector(dist_mat[customer_number,]))
+deliver_from_this_store
+cust_1_vector = c()
+cust_2_vector = c()
+for(customer_number in (n_stores + 1):nrow(dist_mat)){
+deliver_from_this_store = which.min(as.vector(dist_mat[customer_number,]))
+if(deliver_from_this_store == 1){
+cust_1_vector = c(cust_1_vector, customer_number)
 }
-return(mapply(DistM, g1, g2))
+if(deliver_from_this_store == 2){
+cust_2_vector = c(cust_2_vector, customer_number)
 }
-n.geopoints <- nrow(df.geopoints)
-# The index column is used to ensure we only do calculations for the upper triangle of points
-df.geopoints$index <- 1:n.geopoints
-# Create a list of lists
-list.geopoints <- by(df.geopoints[,c("index", "lat", "lon")], 1:n.geopoints, function(x){return(list(x))})
-# Get a matrix of distances (in metres)
-mat.distances <- ReplaceLowerOrUpperTriangle(outer(list.geopoints, list.geopoints, GeoDistanceInMetres), "lower")
-# Set the row and column names
-rownames(mat.distances) <- df.geopoints$name
-colnames(mat.distances) <- df.geopoints$name
-return(mat.distances)
 }
-my_plot_theme = function(){
-font_family = "Helvetica"
-font_face = "bold"
-return(theme(
-axis.text.x = element_text(size = 18, face = font_face, family = font_family),
-axis.text.y = element_text(size = 18, face = font_face, family = font_family),
-axis.title.x = element_text(size = 20, face = font_face, family = font_family),
-axis.title.y = element_text(size = 20, face = font_face, family = font_family),
-strip.text.y = element_text(size = 18, face = font_face, family = font_family),
-plot.title = element_text(size = 18, face = font_face, family = font_family),
-legend.position = "top",
-legend.title = element_text(size = 16,
-face = font_face,
-family = font_family),
-legend.text = element_text(size = 14,
-face = font_face,
-family = font_family)
-))
-}
-# END FUNCTIONS -----------------------------------------------------------
-libs = c('ggplot2', 'lubridate',
-'data.table', 'janitor',
-'ggforce', 'geosphere',
-'reshape','forecast','dplyr',
-'leaflet', "GA", "outliers"
-)
-lapply(libs, require, character.only = TRUE)
-base_dir = "/Users/mlebo1/Desktop/begin_new/geocode_keycities"
-data_dir = "analysis_data"
-plot_dir = "nyc_plots"
-demand_by_time_name = "nyc_orders_lat_long.csv"
-demand_df = fread(file.path(base_dir,
-data_dir,
-demand_by_time_name
+cust_2_vector
+cust_1_vector
+head(dist_input)
+delivery_route = data.frame(fulfillment_node = c(rep(1, length(cust_1_vector)),
+rep(2, length(cust_2_vector))
 ),
-data.table = FALSE
-) %>%
-clean_names() %>%
-mutate(city = tolower(city),
-ordered_qty = 1)
-head(demand_df)
-demand_df$order_dt = lubridate::ymd_hms(demand_df$order_dt)
-demand_df = demand_df %>%
-mutate(day_date = lubridate::date(order_dt),
-order_year = lubridate::year(order_dt),
-order_month = lubridate::month(order_dt),
-order_day = lubridate::day(order_dt),
-order_hour = lubridate::hour(order_dt)
+name = c(cust_1_vector,
+cust_2_vector
 )
-head(demand_df)
-horizon = 12
-demand_monthly = demand_df %>%
-group_by(order_year, order_month) %>%
-mutate(min_month_date = min(day_date)) %>%
-ungroup() %>%
-group_by(order_year, order_month, min_month_date) %>%
-summarise(ordered_qty = sum(ordered_qty)) %>%
-data.frame() %>%
-filter(min_month_date < "2017-11-01") %>%
-select(-order_year, -order_month) %>%
-mutate(value = "actual",
-lwr = NA,
-upr = NA
 )
-ts_input = ts(demand_monthly$ordered_qty,
-frequency = 12)
-ar_fit = auto.arima(ts_input)
-stl_fit = stl(ts_input, s.window = "periodic", robust = TRUE)
-stl_fcast = forecast(stl_fit,
-h = horizon)
-ar_fcast = forecast(ar_fit,
-h = horizon)
-h_fcast = ar_fcast$mean * 0.5 + stl_fcast$mean * 0.5
-lwr = ar_fcast$lower[,1]* 0.5 + stl_fcast$lower[,1] * 0.5
-upr = ar_fcast$upper[,1]* 0.5 + stl_fcast$upper[,1] * 0.5
-forecast_monthly = data.frame(min_month_date = seq.Date(as.Date("2017-11-01"),
-by = "month",
-length.out = horizon),
-ordered_qty = h_fcast,
-value = "forecast",
-lwr = lwr,
-upr = upr
+delivery_route
+dist_input = inner_join(dist_input,
+delivery_route
 )
-monthly_plot = bind_rows(demand_monthly,
-forecast_monthly
-)
-zoom_dates = monthly_plot %>%
-filter(value == 'forecast') %>%
-pull(min_month_date)
-ggplot(monthly_plot, aes(x = min_month_date, y = ordered_qty/1e3, color = value)) +
-geom_point(size = 2) + geom_line(size = 2) +
-#stat_smooth(method = "lm", se = FALSE, color = "black") +
-theme_bw() +
-my_plot_theme() +
-xlab("Date") +
-ylab("Monthly Order Quantity (K)") +
-geom_ribbon(aes(ymin = lwr/1e3,
-ymax = upr/1e3),
-fill = "gray",
-alpha = 0.2
-) +
-facet_zoom(x = min_month_date %in% zoom_dates)
-# best case/worst case growth scenario
-last_year_total = sum(monthly_plot %>%
-filter(value == 'actual') %>%
-tail(horizon) %>%
-pull(ordered_qty))
-lapply(libs, require, character.only = TRUE)
-base_dir = "/Users/mlebo1/Desktop/begin_new/geocode_keycities"
-data_dir = "analysis_data"
-plot_dir = "nyc_plots"
-# read in historical demand by day
-demand_by_time_name = "nyc_orders_lat_long_no_swoosh.csv"
-demand_df = fread(file.path(base_dir,
-data_dir,
-demand_by_time_name
-),
-data.table = FALSE
-) %>%
-clean_names() %>%
-mutate(city = tolower(city),
-ordered_qty = 1)
-head(demand_df)
-unique(demand_df$carrier_service_code)
-table(demand_df$carrier_service_code)
-data.frame(table(demand_df$carrier_service_code))
-lapply(libs, require, character.only = TRUE)
-base_dir = "/Users/mlebo1/Desktop/begin_new/geocode_keycities"
-data_dir = "analysis_data"
-plot_dir = "nyc_plots"
-# read in historical demand by day
-demand_by_time_name = "nyc_orders_lat_long_no_swoosh.csv"
-demand_df = fread(file.path(base_dir,
-data_dir,
-demand_by_time_name
-),
-data.table = FALSE
-) %>%
-clean_names() %>%
-mutate(city = tolower(city),
-ordered_qty = 1)
-data.frame(table(demand_df$carrier_service_code))
-demand_df$order_dt = lubridate::ymd_hms(demand_df$order_dt)
-demand_df = demand_df %>%
-mutate(day_date = lubridate::date(order_dt),
-order_year = lubridate::year(order_dt),
-order_month = lubridate::month(order_dt),
-order_day = lubridate::day(order_dt),
-order_hour = lubridate::hour(order_dt)
-)
-head(demand_df)
-horizon = 12
-demand_monthly = demand_df %>%
-group_by(order_year, order_month) %>%
-mutate(min_month_date = min(day_date)) %>%
-ungroup() %>%
-group_by(order_year, order_month, min_month_date) %>%
-summarise(ordered_qty = sum(ordered_qty)) %>%
-data.frame() %>%
-filter(min_month_date < "2017-11-01") %>%
-select(-order_year, -order_month) %>%
-mutate(value = "actual",
-lwr = NA,
-upr = NA
-)
-ts_input = ts(demand_monthly$ordered_qty,
-frequency = 12)
-ar_fit = auto.arima(ts_input)
-stl_fit = stl(ts_input, s.window = "periodic", robust = TRUE)
-stl_fcast = forecast(stl_fit,
-h = horizon)
-ar_fcast = forecast(ar_fit,
-h = horizon)
-h_fcast = ar_fcast$mean * 0.5 + stl_fcast$mean * 0.5
-lwr = ar_fcast$lower[,1]* 0.5 + stl_fcast$lower[,1] * 0.5
-upr = ar_fcast$upper[,1]* 0.5 + stl_fcast$upper[,1] * 0.5
-forecast_monthly = data.frame(min_month_date = seq.Date(as.Date("2017-11-01"),
-by = "month",
-length.out = horizon),
-ordered_qty = h_fcast,
-value = "forecast",
-lwr = lwr,
-upr = upr
-)
-monthly_plot = bind_rows(demand_monthly,
-forecast_monthly
-)
-ggplot(monthly_plot, aes(x = min_month_date, y = ordered_qty/1e3, color = value)) +
-geom_point(size = 2) + geom_line(size = 2) +
-#stat_smooth(method = "lm", se = FALSE, color = "black") +
-theme_bw() +
-my_plot_theme() +
-xlab("Date") +
-ylab("Monthly Order Quantity (K)") +
-geom_ribbon(aes(ymin = lwr/1e3,
-ymax = upr/1e3),
-fill = "gray",
-alpha = 0.2
-) +
-facet_zoom(x = min_month_date %in% zoom_dates) +
-theme(legend.position = element_blank())
-head(demand_df)
-head(demand_df)
-ts_input = ts(demand_monthly$ordered_qty,
-frequency = 12)
-ar_fit = auto.arima(ts_input)
-stl_fit = stl(ts_input, s.window = "periodic", robust = TRUE)
-stl_fcast = forecast(stl_fit,
-h = horizon)
-ar_fcast = forecast(ar_fit,
-h = horizon)
-h_fcast = ar_fcast$mean * 0.5 + stl_fcast$mean * 0.5
-lwr = ar_fcast$lower[,1]* 0.5 + stl_fcast$lower[,1] * 0.5
-upr = ar_fcast$upper[,1]* 0.5 + stl_fcast$upper[,1] * 0.5
-forecast_monthly = data.frame(min_month_date = seq.Date(as.Date("2017-11-01"),
-by = "month",
-length.out = horizon),
-ordered_qty = h_fcast,
-value = "forecast",
-lwr = lwr,
-upr = upr
-)
-monthly_plot = bind_rows(demand_monthly,
-forecast_monthly
-)
-head(monthly_plot)
-ggplot(monthly_plot, aes(x = min_month_date, y = ordered_qty/1e3, color = value)) +
-geom_point(size = 2) + geom_line(size = 2) +
-#stat_smooth(method = "lm", se = FALSE, color = "black") +
-theme_bw() +
-my_plot_theme() +
-xlab("Date") +
-ylab("Monthly Order Quantity (K)") +
-geom_ribbon(aes(ymin = lwr/1e3,
-ymax = upr/1e3),
-fill = "gray",
-alpha = 0.2
-) +
-facet_zoom(x = min_month_date %in% zoom_dates) +
-theme(legend.position = element_blank())
-ggplot(monthly_plot, aes(x = min_month_date, y = ordered_qty/1e3, color = value)) +
-geom_point(size = 2) + geom_line(size = 2) +
-#stat_smooth(method = "lm", se = FALSE, color = "black") +
-theme_bw() +
-my_plot_theme() +
-xlab("Date") +
-ylab("Monthly Order Quantity (K)") +
-geom_ribbon(aes(ymin = lwr/1e3,
-ymax = upr/1e3),
-fill = "gray",
-alpha = 0.2
-)
-ggplot(monthly_plot, aes(x = min_month_date, y = ordered_qty/1e3, color = value)) +
-geom_point(size = 2) + geom_line(size = 2) +
-#stat_smooth(method = "lm", se = FALSE, color = "black") +
-theme_bw() +
-my_plot_theme() +
-xlab("Date") +
-ylab("Monthly Order Quantity (K)") +
-geom_ribbon(aes(ymin = lwr/1e3,
-ymax = upr/1e3),
-fill = "gray",
-alpha = 0.2
-) +
-facet_zoom(x = min_month_date %in% zoom_dates) +
-theme(legend.position = element_blank())
+dist_input
+ggplot(dist_input, aes(x = lon, y = lat, color = fulfillment_node)) +
+geom_point()
+ggplot(dist_input, aes(x = lon, y = lat, color = as.factor(fulfillment_node))) +
+geom_point()
+ggplot(dist_input, aes(x = lon, y = lat, color = as.factor(fulfillment_node))) +
+geom_point() +
+geom_point(aes(x = store_1_location[1], y = store_1_location[2]), color = "red")
+ggplot(dist_input, aes(x = lon, y = lat, color = as.factor(fulfillment_node))) +
+geom_point() +
+geom_point(aes(x = store_1_location[2], y = store_1_location[1]), color = "red")
+ggplot(dist_input, aes(x = lon, y = lat, color = as.factor(fulfillment_node))) +
+geom_point() +
+geom_point(aes(x = store_1_location[2], y = store_1_location[1]), color = "red", size = 4)
+ggplot(dist_input, aes(x = lon, y = lat, color = as.factor(fulfillment_node))) +
+geom_point() +
+geom_point(aes(x = store_1_location[2], y = store_1_location[1]), color = "red", size = 4) +
+geom_point(aes(x = store_2_location[2], y = store_2_location[1]), color = "blue", size = 4) +
+ggplot(dist_input, aes(x = lon, y = lat, color = as.factor(fulfillment_node))) +
+geom_point() +
+geom_point(aes(x = store_1_location[2], y = store_1_location[1]), color = "red", size = 4) +
+geom_point(aes(x = store_2_location[2], y = store_2_location[1]), color = "blue", size = 4)
+install.packages('geomnet')
+library('geomnet')
+data(madmen, package = "geomnet")
+madmen
+str(madmen)
+names(madmen)
+head(dist_input)
+head(dist_input)
+try1 = dist_input %>%
+select(fulfillment_node, name) %>%
+dplyr::rename(from = fulfillment_node,
+to = name)
+blah = fortify(as.edgedf(try1))
+try1
+install.packages('ggnet2')
+library(network)
+library(GGally)
+mm.net <- network::network(madmen$edges[, 1:2], directed = FALSE)
+mm.net
+madmen$edges[, 1:2]
+try1 = dist_input %>%
+select(fulfillment_node, name) %>%
+dplyr::rename(from = fulfillment_node,
+to = name)
+tr1
+head(try1)
+tripnet
+library(ggmap)
+tripnet
+head(dist_input)
+geom_net(data = tripnet, layout.alg = NULL, labelon = TRUE,
+vjust = -0.5, ealpha = 0.5,
+aes(from_id = from_id,
+to_id = to_id,
+x = long, y = lat,
+linewidth = n / 15,
+colour = Metro))
+library('geomnet')
+data(bikes, package = 'geomnet')
+bikes
+geom_net(data = tripnet, layout.alg = NULL, labelon = TRUE,
+vjust = -0.5, ealpha = 0.5,
+aes(from_id = from_id,
+to_id = to_id,
+x = long, y = lat,
+linewidth = n / 15,
+colour = Metro))
+geom_net(data = bikes, layout.alg = NULL, labelon = TRUE,
+vjust = -0.5, ealpha = 0.5,
+aes(from_id = from_id,
+to_id = to_id,
+x = long, y = lat,
+linewidth = n / 15,
+colour = Metro))
+data(bikes, package = 'geomnet') > # data step for geomnet >
+tripnet <- fortify(as.edgedf(bikes$trips), bikes$stations[,c(2,1,3:5)])
+data(bikes, package = 'geomnet')
+tripnet <- fortify(as.edgedf(bikes$trips), bikes$stations[,c(2,1,3:5)])
+bikes$trips
+bikes$stations
+bikes$stations[,c(2,1,3:5)]
+install.packages('maps')
+install.packages("maps")
+library(maps)
+map("usa", col="tomato",  border="gray10", fill=TRUE, bg="gray30")
+ggplot(dist_input, aes(x = lon, y = lat, color = as.factor(fulfillment_node))) +
+geom_point() +
+geom_point(aes(x = store_1_location[2], y = store_1_location[1]), color = "red", size = 4) +
+geom_point(aes(x = store_2_location[2], y = store_2_location[1]), color = "blue", size = 4)
 library(blogdown)
 library(kableExtra)
 library(rmarkdown)
@@ -507,6 +504,9 @@ library(quantregForest)
 library(broom)
 library(merTools)
 library(lubridate)
+# /Users/mlebo1/Desktop/site/themes/hugo-academic/static/img (this is where the favicon goes)
 setwd('/Users/mlebo1/Desktop/Site')
 blogdown::serve_site()
-servr::daemon_stop("4380103408")
+results$
+servr::daemon_stop("4352931232")
+servr::daemon_stop("4352931232")
