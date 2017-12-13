@@ -2,7 +2,7 @@
 title: "Monte Carlo Power Calculations for Mixed Effects Models"
 author: "Mark LeBoeuf"
 date: '2017-07-28T21:13:14-05:00'
-summary: 'This post covers a straightforward approach to detecting and replacing outliers in time series in order improve forecasting accuracy.'
+summary: 'That’s a dense title – Monte Carlo Simulation, Power, Mixed-Effect models. Each of these topics could be their own post. However, I’m going to discuss their interrelations in the context of experimental power and keep everything high-level. The goal is to get an intuitive idea of how we can leverage simulation to provide sample size estimates for experiments with nested data.'
 tags: ["Monte Carlo Simulation", "Power", "Mixed-Effect Modeling", "R"]
 categories: ["Monte Carlo Simulation", "Power", "Mixed-Effect Modeling", "R"]
 ---
