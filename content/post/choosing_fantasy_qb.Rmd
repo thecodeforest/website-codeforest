@@ -262,7 +262,7 @@ I’ll outline both in further detail below.
 
 The Upper Confidence Bound algorithm is one way to make decisions in the face of uncertainty, in this case, which quarterback to fire up in our lineup each week. The idea is to choose the option with the greatest potential for a favorable outcome, even if our estimate of the probability of that outcome is uncertain (see [here](http://banditalgs.com/2016/09/18/the-upper-confidence-bound-algorithm/) for more detail). We’ll calculate a 90% credible interval for our beta parameter each week. A credible interval is like a confidence interval, but the interpretation is a bit different and, in my opinion, easier to understand. In the current context, a 90% credible interval is the range of values in which we are 90% certain that the probability of weekly success falls based on the data we have thus far (see [here](http://www.john-uebersax.com/stat312/17%20Credible%20Intervals%20and%20Confidence%20Intervals.pdf) for an excellent explanation on the distinction between confidence and credible intervals).
 
-Taking these concepts together, we’ll choose the QB in Week 2 with the highest upper bound on their credible interval. I’ll also include an additional five weeks to show how the interval evolves as we obtain more information.
+Taking these concepts together, we’ll choose the QB in Week 2 with the highest upper bound on their credible interval. I’ll also include an additional ten weeks to show how the interval evolves as we obtain more information.
 
 ```{r, message=FALSE, warning=FALSE}
 credible_intervals = data.frame(NULL)
