@@ -1,497 +1,275 @@
-demand_17 = demand_17 %>%
-arrange(zip_code) %>%
-bind_cols(lat_long_sample_out %>%
-arrange(zip_code) %>%
-select(-zip_code))
-lat_long_sample_df = data.frame(table(demand_17$zip_code)) %>%
-rename(zip_code = Var1,
-order_cnt = Freq) %>%
-mutate(zip_code = as.character(zip_code))
-lat_long_sample_out = data.frame(NULL)
-for(i in unique(lat_long_sample_df$zip_code)){
-temp_cnt = lat_long_sample_df %>%
-filter(zip_code == i) %>%
-pull(order_cnt)
-lat_long_sample_out = bind_rows(lat_long_sample_out,
-lat_long_df %>%
-filter(zip_code == i) %>%
-sample_n(temp_cnt)
-)
+head(blargh)
+head(prediction_results)
+coverage_calc = function(actual, upr, lwr){
+return(ifelse(actual < upr & actual > lwr, 1, 0))
 }
-lat_long_df
-lat_long_sample_df
-lat_long_sample_df = data.frame(table(demand_17$zip_code)) %>%
-rename(zip_code = Var1,
-order_cnt = Freq) %>%
-mutate(zip_code = as.character(zip_code))
-example <- read.csv("http://web.hku.hk/~bcowling/data/propensity.csv", header=TRUE)
-example
-head(example)
-rhc <- read.csv("http://biostat.mc.vanderbilt.edu/wiki/pub/Main/DataSets/rhc.csv")
-head(rhc)
-head(rhc)
-library(keras)
-library(lime)
-library(tidyquant)
-library(rsample)
-library(recipes)
-library(yardstick)
-library(corrr)
-install.packages('lime')
-library(readr)
-library(dplyr)
-library(data.table)
-outcome_df <- read_csv("http://biostat.mc.vanderbilt.edu/wiki/pub/Main/DataSets/rhc.csv")
-head(outcome_df)
-data_url = "http://biostat.mc.vanderbilt.edu/wiki/pub/Main/DataSets/rhc.csv"
-outcome_df <- read_csv(data_url) %>%
+prediction_results %>%
+mutate(nn = mape_calc(actual, nn_point_forecast),
+stl = mape_calc(actual, stl_point_forecast),
+hw= mape_calc(actual, hw_point_forecast),
+nn_coverage = coverage_calc(actual, nn_hi_95, nn_lo_95),
+stl_coverage = coverage_calc(actual, stl_hi_95, stl_lo_95),
+hw_coverage = coverage_calc(actual, hw_hi_95, hw_lo_95)
+) %>%
+head(10)
+prediction_results %>%
+mutate(nn = mape_calc(actual, nn_point_forecast),
+stl = mape_calc(actual, stl_point_forecast),
+hw= mape_calc(actual, hw_point_forecast),
+nn_coverage = coverage_calc(actual, nn_hi_95, nn_lo_95),
+stl_coverage = coverage_calc(actual, stl_hi_95, stl_lo_95),
+hw_coverage = coverage_calc(actual, hw_hi_95, hw_lo_95)
+) %>%
+select(nn:hw_coverage) %>%
+melt() %>%
+head(5)
+test_results = prediction_results %>%
+mutate(nn = mape_calc(actual, nn_point_forecast),
+stl = mape_calc(actual, stl_point_forecast),
+hw= mape_calc(actual, hw_point_forecast),
+nn_coverage = coverage_calc(actual, nn_hi_95, nn_lo_95),
+stl_coverage = coverage_calc(actual, stl_hi_95, stl_lo_95),
+hw_coverage = coverage_calc(actual, hw_hi_95, hw_lo_95)
+) %>%
+select(nn:hw_coverage)
+head(test_results)
+test_mape = test_results %>%
+select(nn:hw) %>%
+melt() %>%
+rename(method = variable,
+MAPE = value) %>%
+group_by(method) %>%
+summarise(MAPE = round(mean(MAPE), 2)) %>%
+data.frame() %>%
+arrange(MAPE)
+head(test_mape)
+test_coverage = test_results %>%
+select(nn_coverage:hw_coverage) %>%
+melt() %>%
+head(10)
+head(test_coverage)
+test_coverage = test_results %>%
+select(nn_coverage:hw_coverage) %>%
+melt() %>%
+head(10) %>%
+rename(method = variable) %>%
+group_by(method) %>%
+summarise(coverage = round(sum(value)/n() * 100, 1)) %>%
 data.frame()
-head(outcome_df)
-head(outcome_df)
-library(rsample)
-install.packages('rsample')
-library(rsample)
-lat_long_name = 'lat_long_zip.csv'
-# lat_long_df is all geocoded orders placed on Nike.com
-lat_long_df = fread(file.path(base_dir,
-data_dir,
-lat_long_name),
-data.table = FALSE) %>%
-clean_names() %>%
-filter(zip_code %in% manhatten_zips)
-lat_long_sample_df = data.frame(table(demand_17$zip_code)) %>%
-rename(zip_code = Var1,
-order_cnt = Freq) %>%
-mutate(zip_code = as.character(zip_code))
-lat_long_sample_out = data.frame(NULL)
-for(i in unique(lat_long_sample_df$zip_code)){
-temp_cnt = lat_long_sample_df %>%
-filter(zip_code == i) %>%
-pull(order_cnt)
-lat_long_sample_out = bind_rows(lat_long_sample_out,
-lat_long_df %>%
-filter(zip_code == i) %>%
-sample_n(temp_cnt)
+head(test_coverage)
+test_coverage = test_results %>%
+select(nn_coverage:hw_coverage) %>%
+melt() %>%
+head(10) %>%
+rename(method = variable) %>%
+group_by(method) %>%
+summarise(coverage = round(sum(value)/n() * 100, 1)) %>%
+data.frame()
+head(test_coverage)
+test_coverage = test_results %>%
+select(nn_coverage:hw_coverage) %>%
+melt()
+View(test_coverage)
+test_coverage = test_results %>%
+select(nn_coverage:hw_coverage) %>%
+melt() %>%
+rename(method = variable) %>%
+group_by(method) %>%
+summarise(coverage = round(sum(value)/n() * 100, 1)) %>%
+data.frame()
+head(test_coverage)
+head(test_mape)
+help(gsub)
+test_coverage = test_results %>%
+select(nn_coverage:hw_coverage) %>%
+melt() %>%
+rename(method = variable) %>%
+group_by(method) %>%
+summarise(coverage = round(sum(value)/n() * 100, 1)) %>%
+data.frame() %>%
+mutate(method = gsub("_coverage", "", method))
+head(test_coverage)
+test_comparison_df = inner_join(test_mape,
+test_coverage
+) %>%
+arrange(MAPE, coverage)
+test_comparison_df
+# combine all forecasts here
+mape_calc = function(actual, predicted){
+return(abs(actual - predicted)/actual * 100)
+}
+coverage_calc = function(actual, upr, lwr){
+return(ifelse(actual < upr & actual > lwr, 1, 0))
+}
+test_results = prediction_results %>%
+mutate(nn = mape_calc(actual, nn_point_forecast),
+stl = mape_calc(actual, stl_point_forecast),
+hw= mape_calc(actual, hw_point_forecast),
+nn_coverage = coverage_calc(actual, nn_hi_95, nn_lo_95),
+stl_coverage = coverage_calc(actual, stl_hi_95, stl_lo_95),
+hw_coverage = coverage_calc(actual, hw_hi_95, hw_lo_95)
+) %>%
+select(nn:hw_coverage)
+test_mape = test_results %>%
+select(nn:hw) %>%
+melt() %>%
+rename(method = variable,
+MAPE = value) %>%
+group_by(method) %>%
+summarise(MAPE = round(mean(MAPE), 2)) %>%
+data.frame()
+test_coverage = test_results %>%
+select(nn_coverage:hw_coverage) %>%
+melt() %>%
+rename(method = variable) %>%
+group_by(method) %>%
+summarise(coverage = round(sum(value)/n() * 100, 1)) %>%
+data.frame() %>%
+mutate(method = gsub("_coverage", "", method))
+test_comparison_df = inner_join(test_mape,
+test_coverage
+) %>%
+rename(coverage_95 = coverage) %>%
+arrange(MAPE, coverage_95)
+p = 0.25
+n = 5
+k = 2
+factorial(n)
+factorial(n)/factorial(n - k) * factorial(k)
+factorial(n)/factorial(n - k) * factorial(k) * p^k * (1 - p)^(n - k)
+factorial(n)/factorial(n - k) * factorial(k) * p^k * ((1 - p)^(n - k))
+(factorial(n)/(factorial(n - k) * factorial(k))) * p^k * ((1 - p)^(n - k))
+(factorial(n)/(factorial(n - k) * factorial(k))) * p^k * (1 - p)^(n - k)
+p = 0.25
+n = 5
+k = 1
+(factorial(n)/(factorial(n - k) * factorial(k))) * p^k * (1 - p)^(n - k)
+p = 0.25
+n = 4
+k = 1
+(factorial(n)/(factorial(n - k) * factorial(k))) * p^k * (1 - p)^(n - k)
+p = 0.25
+n = 10
+k = 1
+(factorial(n)/(factorial(n - k) * factorial(k))) * p^k * (1 - p)^(n - k)
+my_plot_theme = function(){
+font_family = "Helvetica"
+font_face = "bold"
+return(theme(
+axis.text.x = element_text(size = 18, face = font_face, family = font_family),
+axis.text.y = element_text(size = 18, face = font_face, family = font_family),
+axis.title.x = element_text(size = 20, face = font_face, family = font_family),
+axis.title.y = element_text(size = 20, face = font_face, family = font_family),
+strip.text.y = element_text(size = 18, face = font_face, family = font_family),
+plot.title = element_text(size = 18, face = font_face, family = font_family),
+legend.position = "top",
+legend.title = element_text(size = 16,
+face = font_face,
+family = font_family),
+legend.text = element_text(size = 14,
+face = font_face,
+family = font_family)
+))
+}
+### Downloading images ###
+libs = c('RJSONIO', 'keras', 'ggplot2', 'dplyr', 'reshape')
+lapply(libs, require, character.only = TRUE)
+base_dir = dirname(rstudioapi::getSourceEditorContext()$path)
+setwd(base_dir)
+blargh = application_vgg19()
+summary(blargh)
+my_plot_theme = function(){
+font_family = "Helvetica"
+font_face = "bold"
+return(theme(
+axis.text.x = element_text(size = 18, face = font_face, family = font_family),
+axis.text.y = element_text(size = 18, face = font_face, family = font_family),
+axis.title.x = element_text(size = 20, face = font_face, family = font_family),
+axis.title.y = element_text(size = 20, face = font_face, family = font_family),
+strip.text.y = element_text(size = 18, face = font_face, family = font_family),
+plot.title = element_text(size = 18, face = font_face, family = font_family),
+legend.position = "top",
+legend.title = element_text(size = 16,
+face = font_face,
+family = font_family),
+legend.text = element_text(size = 14,
+face = font_face,
+family = font_family)
+))
+}
+### Downloading images ###
+libs = c('RJSONIO', 'keras', 'ggplot2', 'dplyr', 'reshape')
+lapply(libs, require, character.only = TRUE)
+base_dir = dirname(rstudioapi::getSourceEditorContext()$path)
+setwd(base_dir)
+blargh = application_vgg19()
+summary(blargh)
+conv_base <- application_vgg16(
+weights = "imagenet",
+include_top = FALSE,
+input_shape = c(150, 150, 3)
 )
-}
-#
-demand_17 = demand_17 %>%
-arrange(zip_code) %>%
-bind_cols(lat_long_sample_out %>%
-arrange(zip_code) %>%
-select(-zip_code))
-lat_long_name = 'lat_long_zip.csv'
-# lat_long_df is all geocoded orders placed on Nike.com
-lat_long_df = fread(file.path(base_dir,
-data_dir,
-lat_long_name),
-data.table = FALSE) %>%
-clean_names() %>%
-filter(zip_code %in% manhatten_zips)
-lat_long_sample_df = data.frame(table(demand_17$zip_code)) %>%
-rename(zip_code = Var1,
-order_cnt = Freq) %>%
-mutate(zip_code = as.character(zip_code))
-head(lat_long_sample_df)
-lat_long_sample_out = data.frame(NULL)
-for(i in unique(lat_long_sample_df$zip_code)){break}
-temp_cnt = lat_long_sample_df %>%
-filter(zip_code == i) %>%
-pull(order_cnt)
-temp_cnt
-head(lat_long_sample_df)
-head(lat_long_df)
-lat_long_sample_out = bind_rows(lat_long_sample_out,
-lat_long_df %>%
-filter(zip_code == i) %>%
-sample_n(temp_cnt)
-lat_long_sample_out = bind_rows(lat_long_sample_out,
-lat_long_df %>%
-filter(zip_code == i) %>%
-sample_n(temp_cnt))
-head(lat_long_df)
-nrow(lat_long_df)
-nrow(demand_17)
-lat_long_sample_out = bind_rows(lat_long_sample_out,
-lat_long_df %>%
-filter(zip_code == i) %>%
-sample_n(temp_cnt, replace = TRUE))
-lat_long_sample_out = data.frame(NULL)
-for(i in unique(lat_long_sample_df$zip_code)){break}
-temp_cnt = lat_long_sample_df %>%
-filter(zip_code == i) %>%
-pull(order_cnt)
-lat_long_sample_out = bind_rows(lat_long_sample_out,
-lat_long_df %>%
-filter(zip_code == i) %>%
-sample_n(temp_cnt, replace = TRUE))
-}
-lat_long_sample_out = data.frame(NULL)
-for(i in unique(lat_long_sample_df$zip_code)){
-temp_cnt = lat_long_sample_df %>%
-filter(zip_code == i) %>%
-pull(order_cnt)
-lat_long_sample_out = bind_rows(lat_long_sample_out,
-lat_long_df %>%
-filter(zip_code == i) %>%
-sample_n(temp_cnt, replace = TRUE))
-}
-head(lat_long_sample_out)
-tail(lat_long_sample_out)
-nrow(lat_long_sample_out)
-nrow(lat_long_sample_out %>% distinct())
-demand_17 = demand_17 %>%
-arrange(zip_code) %>%
-bind_cols(lat_long_sample_out %>%
-arrange(zip_code) %>%
-select(-zip_code))
-head(demand_17)
-ggplot(demand_17, aes(x = long, y = lat)) +
-geom_point()
-demand_17_no = demand_17 %>%
-mutate(lat_scale = as.vector(abs(scale(lat))),
-long_scale = as.vector(abs(scale(long)))) %>%
-filter(lat_scale <= 3 & long_scale <= 3) %>%
-mutate(lat_scale = as.vector(abs(scale(lat))),
-long_scale = as.vector(abs(scale(long)))) %>%
-filter(lat_scale <= 3 & long_scale <= 3)
-head(demand_17_no)
-ggplot(demand_17_no, aes(x = long, y = lat)) +
-geom_point()
-demand_17_no = demand_17 %>%
-mutate(lat_scale = as.vector(abs(scale(lat))),
-long_scale = as.vector(abs(scale(long)))) %>%
-filter(lat_scale <= 3 & long_scale <= 3) %>%
-mutate(lat_scale = as.vector(abs(scale(lat))),
-long_scale = as.vector(abs(scale(long)))) %>%
-filter(lat_scale <= 3 & long_scale <= 3) %>%
-filter(lat >= 40.69)
-ggplot(demand_17_no, aes(x = long, y = lat)) +
-geom_point()
-unique_dates = order(unique(demand_17_no$day_date))
-unique_dates
-unique_dates = unique(demand_17_no$day_date)
-unique_dates
-unique_dates = arrange(unique(demand_17_no$day_date))
-unique_dates = sort(unique(demand_17_no$day_date))
-unique_dates
-for(tmp_date in unique_dates){break}
-temp_day = demand_17_no %>%
-filter(day_date == tmp_date)
-temp_day
-demand_17_no = demand_17 %>%
-mutate(lat_scale = as.vector(abs(scale(lat))),
-long_scale = as.vector(abs(scale(long)))) %>%
-filter(lat_scale <= 3 & long_scale <= 3) %>%
-mutate(lat_scale = as.vector(abs(scale(lat))),
-long_scale = as.vector(abs(scale(long)))) %>%
-filter(lat_scale <= 3 & long_scale <= 3) %>%
-filter(lat >= 40.69) %>%
-select(-lat_scale, -long_scale)
-unique_dates = sort(unique(demand_17_no$day_date))
-for(tmp_date in unique_dates){break}
-temp_day = demand_17_no %>%
-filter(day_date == tmp_date)
-temp_day
-time_cutoff = 19
-temp_day = demand_17_no %>%
-filter(day_date == tmp_date) %>%
-filter(order_hour <= time_cutoff)
-temp_day
-temp_day = demand_17_no %>%
-filter(day_date == tmp_date) %>%
-filter(order_hour <= time_cutoff) %>%
-arrange(order_hour)
-temp_day
-tail(temp_day)
-ggplot(temp_day, aes(x = long, y = lat)) +
-geom_point()
-temp_day = demand_17_no %>%
-filter(day_date == tmp_date) %>%
-filter(order_hour <= time_cutoff) %>%
-arrange(order_hour) %>%
-mutate(lat_scale = as.vector(abs(scale(lat))),
-long_scale = as.vector(abs(scale(long)))) %>%
-filter(lat_scale <= 3 & long_scale <= 3) %>%
-select(-lat_scale, -long_scale)
-ggplot(temp_day, aes(x = long, y = lat)) +
-geom_point()
-demand_17_no = demand_17 %>%
-mutate(lat_scale = as.vector(abs(scale(lat))),
-long_scale = as.vector(abs(scale(long)))) %>%
-filter(lat_scale <= 3 & long_scale <= 3) %>%
-mutate(lat_scale = as.vector(abs(scale(lat))),
-long_scale = as.vector(abs(scale(long)))) %>%
-filter(lat_scale <= 3 & long_scale <= 3) %>%
-filter(lat >= 40.69) %>%
-filter(long >= -74.03)
-unique_dates = sort(unique(demand_17_no$day_date))
-for(tmp_date in unique_dates){break}
-temp_day = demand_17_no %>%
-filter(day_date == tmp_date) %>%
-filter(order_hour <= time_cutoff) %>%
-arrange(order_hour) %>%
-mutate(lat_scale = as.vector(abs(scale(lat))),
-long_scale = as.vector(abs(scale(long)))) %>%
-filter(lat_scale <= 3 & long_scale <= 3) %>%
-select(-lat_scale, -long_scale)
-ggplot(temp_day, aes(x = long, y = lat)) +
-geom_point()
-temp_day = demand_17_no %>%
-filter(day_date == tmp_date) %>%
-filter(order_hour <= time_cutoff) %>%
-arrange(order_hour)
-temp_day
-x <- rbind(matrix(rnorm(100, sd = 0.3), ncol = 2),
-matrix(rnorm(100, mean = 1, sd = 0.3), ncol = 2))
-x
-x[1:3,]
-temp_day
-kmeans_input = temp_day %>%
-select(lat, long)
-kmeans_input
-kmeans_input = bind_rows(kmeans_input,
-data.frame(lat = c(store_1_location[1], store_2_location[1]),
-long = c(store_1_location[2], store_2_location[2])))
-head(kmeans_input)
-blah = kmeans(kmeans_input, centers = kmeans_input[1:2,])
-blah$centers
-head(blah)
-blah$centers
-head(kmeans_input)
-help(kmeans)
-blah = kmeans(kmeans_input, centers = kmeans_input[1:2,], iter.max = 1)
-blah$centers
-head(kmeans_input, 2)
-n_stores = 2
-blah = kmeans(kmeans_input, centers = n_stores)
-blah$cluster
-help(kmeans)
-kmeans_input = temp_day %>%
-select(lat, long)
-kmeans_input = bind_rows(kmeans_input,
-data.frame(lat = c(store_1_location[1], store_2_location[1]),
-long = c(store_1_location[2], store_2_location[2])))
-blah = kmeans(kmeans_input, centers = kmeans_input[1:2,], iter.max = 1)
-blah$cluster
-dist_input = temp_day %>%
-select(lat, long)
-dist_input = bind_rows(
-data.frame(lat = c(store_1_location[1], store_2_location[1]),
-long = c(store_1_location[2], store_2_location[2])),
-dist_input)
-temp_day = demand_17_no %>%
-filter(day_date == tmp_date) %>%
-filter(order_hour <= time_cutoff) %>%
-arrange(order_hour)
-dist_input = temp_day %>%
-select(lat, long)
-dist_input = bind_rows(
-data.frame(lat = c(store_1_location[1], store_2_location[1]),
-long = c(store_1_location[2], store_2_location[2])),
-dist_input)
-dist_input$name = 1:nrow(dist_input)
-dist_input
-# BEGIN FUNCTIONS ---------------------------------------------------------
-ReplaceLowerOrUpperTriangle <- function(m, triangle.to.replace){
-# If triangle.to.replace="lower", replaces the lower triangle of a square matrix with its upper triangle.
-# If triangle.to.replace="upper", replaces the upper triangle of a square matrix with its lower triangle.
-if (nrow(m) != ncol(m)) stop("Supplied matrix must be square.")
-if      (tolower(triangle.to.replace) == "lower") tri <- lower.tri(m)
-else if (tolower(triangle.to.replace) == "upper") tri <- upper.tri(m)
-else stop("triangle.to.replace must be set to 'lower' or 'upper'.")
-m[tri] <- t(m)[tri]
-return(m)
-}
-GeoDistanceInMetresMatrix <- function(df.geopoints){
-# Returns a matrix (M) of distances between geographic points.
-# M[i,j] = M[j,i] = Distance between (df.geopoints$lat[i], df.geopoints$lon[i]) and
-# (df.geopoints$lat[j], df.geopoints$lon[j]).
-# The row and column names are given by df.geopoints$name.
-GeoDistanceInMetres <- function(g1, g2){
-# Returns a vector of distances. (But if g1$index > g2$index, returns zero.)
-# The 1st value in the returned vector is the distance between g1[[1]] and g2[[1]].
-# The 2nd value in the returned vector is the distance between g1[[2]] and g2[[2]]. Etc.
-# Each g1[[x]] or g2[[x]] must be a list with named elements "index", "lat" and "lon".
-# E.g. g1 <- list(list("index"=1, "lat"=12.1, "lon"=10.1), list("index"=3, "lat"=12.1, "lon"=13.2))
-DistM <- function(g1, g2){
-require("Imap")
-return(ifelse(g1$index > g2$index, 0, gdist(lat.1=g1$lat, lon.1=g1$lon, lat.2=g2$lat, lon.2=g2$lon, units="m")))
-}
-return(mapply(DistM, g1, g2))
-}
-n.geopoints <- nrow(df.geopoints)
-# The index column is used to ensure we only do calculations for the upper triangle of points
-df.geopoints$index <- 1:n.geopoints
-# Create a list of lists
-list.geopoints <- by(df.geopoints[,c("index", "lat", "lon")], 1:n.geopoints, function(x){return(list(x))})
-# Get a matrix of distances (in metres)
-mat.distances <- ReplaceLowerOrUpperTriangle(outer(list.geopoints, list.geopoints, GeoDistanceInMetres), "lower")
-# Set the row and column names
-rownames(mat.distances) <- df.geopoints$name
-colnames(mat.distances) <- df.geopoints$name
-return(mat.distances)
-}
-dist_mat = GeoDistanceInMetresMatrix(dist_input)
-dist_input = temp_day %>%
-select(lat, long)
-dist_input = bind_rows(
-data.frame(lat = c(store_1_location[1], store_2_location[1]),
-long = c(store_1_location[2], store_2_location[2])),
-dist_input) %>%
-dplyr::rename(lon = long)
-dist_input$name = 1:nrow(dist_input)
-dist_mat = GeoDistanceInMetresMatrix(dist_input)
-head(dist_mat)
-colnames(dist_mat)
-dist_mat = GeoDistanceInMetresMatrix(dist_input)[,1:n_stores]
-head(dist_mat)
-for(j in (n_stores + 1):nrow(dist_mat)){
-print(dist_mat[j,])
-break
-}
-for(j in (n_stores + 1):nrow(dist_mat)){break}
-j
-print(dist_mat[j,])
-delivery_list = list()
-print(as.vector(dist_mat[j,]))
-print(which.min(as.vector(dist_mat[j,])))
-deliver_from_this_store = which.min(as.vector(dist_mat[j,]))
-deliver_from_this_store = which.min(as.vector(dist_mat[customer_number,]))
-for(customer_number in (n_stores + 1):nrow(dist_mat)){break}
-deliver_from_this_store = which.min(as.vector(dist_mat[customer_number,]))
-delivery_list = list()
-delivery_list[["1"]] = c()
-delivery_list[["2"]] = c()
-delivery_list = list()
-delivery_list[["1"]] = c()
-delivery_list[["2"]] = c()
-for(customer_number in (n_stores + 1):nrow(dist_mat)){
-deliver_from_this_store = which.min(as.vector(dist_mat[customer_number,]))
-delivery_list[[as.character(deliver_from_this_store)]] = customer_number
-}
-delivery_list
-cust_1_vector = c()
-cust_2_vector = c()
-for(customer_number in (n_stores + 1):nrow(dist_mat)){break}
-deliver_from_this_store = which.min(as.vector(dist_mat[customer_number,]))
-deliver_from_this_store
-cust_1_vector = c()
-cust_2_vector = c()
-for(customer_number in (n_stores + 1):nrow(dist_mat)){
-deliver_from_this_store = which.min(as.vector(dist_mat[customer_number,]))
-if(deliver_from_this_store == 1){
-cust_1_vector = c(cust_1_vector, customer_number)
-}
-if(deliver_from_this_store == 2){
-cust_2_vector = c(cust_2_vector, customer_number)
-}
-}
-cust_2_vector
-cust_1_vector
-head(dist_input)
-delivery_route = data.frame(fulfillment_node = c(rep(1, length(cust_1_vector)),
-rep(2, length(cust_2_vector))
-),
-name = c(cust_1_vector,
-cust_2_vector
+vgg_19_base <- application_vgg19(
+weights = "imagenet",
+include_top = FALSE,
+input_shape = c(150, 150, 3)
 )
+vgg_19_base
+#summary(blargh)
+#http://www.image-net.org/
+image_url_json = list(
+'hot dog' = c('http://www.image-net.org/api/text/imagenet.synset.geturls?wnid=n07697537',
+'http://www.image-net.org/api/text/imagenet.synset.geturls?wnid=n07690019'),
+'hamburger' = c('http://www.image-net.org/api/text/imagenet.synset.geturls?wnid=n07697100',
+'http://www.image-net.org/api/text/imagenet.synset.geturls?wnid=n07697313'),
+'pizza' = c('http://www.image-net.org/api/text/imagenet.synset.geturls?wnid=n07874159',
+'http://www.image-net.org/api/text/imagenet.synset.geturls?wnid=n07874259'),
+'taco' = c('http://www.image-net.org/api/text/imagenet.synset.geturls?wnid=n07880751',
+'http://www.image-net.org/api/text/imagenet.synset.geturls?wnid=n07880880')
 )
-delivery_route
-dist_input = inner_join(dist_input,
-delivery_route
+train_dir = file.path(base_dir, 'train')
+train_datagen <- image_data_generator(rescale = 1/255,
+rotation_range = 40,
+width_shift_range = 0.20,
+height_shift_range = 0.20,
+shear_range = 0.20,
+zoom_range = 0.20,
+horizontal_flip = TRUE
 )
-dist_input
-ggplot(dist_input, aes(x = lon, y = lat, color = fulfillment_node)) +
-geom_point()
-ggplot(dist_input, aes(x = lon, y = lat, color = as.factor(fulfillment_node))) +
-geom_point()
-ggplot(dist_input, aes(x = lon, y = lat, color = as.factor(fulfillment_node))) +
-geom_point() +
-geom_point(aes(x = store_1_location[1], y = store_1_location[2]), color = "red")
-ggplot(dist_input, aes(x = lon, y = lat, color = as.factor(fulfillment_node))) +
-geom_point() +
-geom_point(aes(x = store_1_location[2], y = store_1_location[1]), color = "red")
-ggplot(dist_input, aes(x = lon, y = lat, color = as.factor(fulfillment_node))) +
-geom_point() +
-geom_point(aes(x = store_1_location[2], y = store_1_location[1]), color = "red", size = 4)
-ggplot(dist_input, aes(x = lon, y = lat, color = as.factor(fulfillment_node))) +
-geom_point() +
-geom_point(aes(x = store_1_location[2], y = store_1_location[1]), color = "red", size = 4) +
-geom_point(aes(x = store_2_location[2], y = store_2_location[1]), color = "blue", size = 4) +
-ggplot(dist_input, aes(x = lon, y = lat, color = as.factor(fulfillment_node))) +
-geom_point() +
-geom_point(aes(x = store_1_location[2], y = store_1_location[1]), color = "red", size = 4) +
-geom_point(aes(x = store_2_location[2], y = store_2_location[1]), color = "blue", size = 4)
-install.packages('geomnet')
-library('geomnet')
-data(madmen, package = "geomnet")
-madmen
-str(madmen)
-names(madmen)
-head(dist_input)
-head(dist_input)
-try1 = dist_input %>%
-select(fulfillment_node, name) %>%
-dplyr::rename(from = fulfillment_node,
-to = name)
-blah = fortify(as.edgedf(try1))
-try1
-install.packages('ggnet2')
-library(network)
-library(GGally)
-mm.net <- network::network(madmen$edges[, 1:2], directed = FALSE)
-mm.net
-madmen$edges[, 1:2]
-try1 = dist_input %>%
-select(fulfillment_node, name) %>%
-dplyr::rename(from = fulfillment_node,
-to = name)
-tr1
-head(try1)
-tripnet
-library(ggmap)
-tripnet
-head(dist_input)
-geom_net(data = tripnet, layout.alg = NULL, labelon = TRUE,
-vjust = -0.5, ealpha = 0.5,
-aes(from_id = from_id,
-to_id = to_id,
-x = long, y = lat,
-linewidth = n / 15,
-colour = Metro))
-library('geomnet')
-data(bikes, package = 'geomnet')
-bikes
-geom_net(data = tripnet, layout.alg = NULL, labelon = TRUE,
-vjust = -0.5, ealpha = 0.5,
-aes(from_id = from_id,
-to_id = to_id,
-x = long, y = lat,
-linewidth = n / 15,
-colour = Metro))
-geom_net(data = bikes, layout.alg = NULL, labelon = TRUE,
-vjust = -0.5, ealpha = 0.5,
-aes(from_id = from_id,
-to_id = to_id,
-x = long, y = lat,
-linewidth = n / 15,
-colour = Metro))
-data(bikes, package = 'geomnet') > # data step for geomnet >
-tripnet <- fortify(as.edgedf(bikes$trips), bikes$stations[,c(2,1,3:5)])
-data(bikes, package = 'geomnet')
-tripnet <- fortify(as.edgedf(bikes$trips), bikes$stations[,c(2,1,3:5)])
-bikes$trips
-bikes$stations
-bikes$stations[,c(2,1,3:5)]
-install.packages('maps')
-install.packages("maps")
-library(maps)
-map("usa", col="tomato",  border="gray10", fill=TRUE, bg="gray30")
-ggplot(dist_input, aes(x = lon, y = lat, color = as.factor(fulfillment_node))) +
-geom_point() +
-geom_point(aes(x = store_1_location[2], y = store_1_location[1]), color = "red", size = 4) +
-geom_point(aes(x = store_2_location[2], y = store_2_location[1]), color = "blue", size = 4)
+validation_datagen <- image_data_generator(rescale = 1/255)
+train_generator <- flow_images_from_directory(
+train_dir,
+train_datagen,
+target_size = c(150, 150),
+batch_size = 20,
+class_mode = "categorical"
+)
+validation_dir = file.path(base_dir, 'validation')
+validation_generator <- flow_images_from_directory(
+validation_dir,
+validation_datagen,
+target_size = c(150, 150),
+batch_size = 20,
+class_mode = "categorical"
+)
+model = keras_model_sequential() %>%
+layer_conv_2d(filters = 8, kernel_size = c(3, 3), activation = "relu",
+input_shape = c(150, 150, 3)) %>%
+layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+layer_conv_2d(filters = 16, kernel_size = c(3, 3), activation = "relu") %>%
+layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+layer_conv_2d(filters = 32, kernel_size = c(3, 3), activation = "relu") %>%
+layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+layer_flatten() %>%
+layer_dropout(rate = 0.25) %>%
+layer_dense(units = 64, activation = "relu") %>%
+layer_dense(units = length(names(image_url_json)), activation = "softmax")
+model
+attributes(model)
+model$input_spec
+model$weights
+model
+vgg_19_base
 library(blogdown)
 library(kableExtra)
 library(rmarkdown)
@@ -504,9 +282,231 @@ library(quantregForest)
 library(broom)
 library(merTools)
 library(lubridate)
-# /Users/mlebo1/Desktop/site/themes/hugo-academic/static/img (this is where the favicon goes)
+setwd('/Users/mlebo1/Desktop/Site')
+#blogdown::install_hugo(force = TRUE)
+#blogdown::new_site(theme = "gcushen/hugo-academic")
+blogdown::serve_site()
+servr::daemon_stop("4320050208")
+library(lubridate)
+library(dplyr)
+library(sqldf)
+library(RPostgreSQL)
+con = dbConnect(pg, user="postgres", password="password",
+host="localhost", port=5432)
+pg = dbDriver("PostgreSQL")
+con = dbConnect(pg, user="postgres", password="password",
+host="localhost", port=5432)
+blah = dbGetQuery(con, "select * from flights limit 10")
+head(blah, 30)
+View(blah)
+my_query =
+"
+SELECT carrier, month, AVG(air_time) OVER (PARTITION BY carrier, month)
+FROM flights
+"
+results = sqldf(my_query)
+my_query =
+"
+SELECT carrier, month, AVG(air_time) OVER (PARTITION BY carrier, month)
+FROM flights
+"
+blah = dbGetQuery(con, my_query)
+head(blah, 30)
+my_query =
+"
+select * from flights limit 10
+"
+blah = dbGetQuery(con, my_query)
+flight_tbl = dbGetQuery(con, my_query)
+View(flight_tbl)
+my_query =
+"
+SELECT carrier, month air_time, AVG(air_time) OVER (PARTITION BY carrier, month)
+FROM flights
+"
+results = dbGetQuery(con, my_query)
+results
+my_query =
+"
+SELECT carrier, month, air_time, AVG(air_time) OVER (PARTITION BY carrier, month)
+FROM flights
+"
+results = dbGetQuery(con, my_query)
+results
+my_query =
+"
+SELECT carrier,
+month,
+MIN(air_time - avg_air_time) min_air as min_diff,
+MAX(air_time - avg_air_time) max_air as max_diff
+FROM
+(SELECT carrier, month, air_time, AVG(air_time) OVER (PARTITION BY carrier, month) as avg_air_time
+FROM flights) as table_1
+GROUP BY carrier, month
+"
+results = dbGetQuery(con, my_query)
+head(results)
+my_query =
+"
+SELECT carrier, month, air_time, AVG(air_time) OVER (PARTITION BY carrier, month) as avg_air_time
+FROM flights
+"
+results = dbGetQuery(con, my_query)
+head(results)
+# tailnum is ID
+my_query =
+"
+select carrier, month, air_time - avg_air_time as air_time_diff
+FROM
+(SELECT carrier, month, air_time, AVG(air_time) OVER (PARTITION BY carrier, month) as avg_air_time
+FROM flights) as table_1
+"
+results = dbGetQuery(con, my_query)
+head(results)
+my_query =
+"
+SELECT carrier, month, MIN(air_time_diff) as min_air, MAX(air_time_diff) as max_air
+FROM
+(select carrier,
+month,
+air_time - avg_air_time as air_time_diff
+FROM
+(SELECT carrier, month, air_time, AVG(air_time) OVER (PARTITION BY carrier, month) as avg_air_time
+FROM flights) as table_1) as table_2
+"
+results = dbGetQuery(con, my_query)
+head(results)
+my_query =
+"
+SELECT carrier,
+month,
+MIN(air_time - avg_air_time) min_air as min_diff,
+MAX(air_time - avg_air_time) max_air as max_diff
+SELECT carrier, month, MIN(air_time_diff) as min_air, MAX(air_time_diff) as max_air
+FROM
+(select carrier,
+month,
+air_time - avg_air_time as air_time_diff
+FROM
+(SELECT carrier, month, air_time, AVG(air_time) OVER (PARTITION BY carrier, month) as avg_air_time
+FROM flights) as table_1) as table_2
+GROUP BY carrier, month
+"
+results = dbGetQuery(con, my_query)
+head(results)
+my_query =
+"
+select carrier, month, air_time - avg_air_time as air_time_diff
+FROM
+(SELECT carrier, month, air_time, AVG(air_time) OVER (PARTITION BY carrier, month) as avg_air_time
+FROM flights) as table_1
+"
+results = dbGetQuery(con, my_query)
+head(results)
+my_query =
+"
+SELECT carrier, month, min(air_time_diff) as min_diff, max(air_time_diff) as max_diff
+FROM
+(
+select carrier, month, air_time - avg_air_time as air_time_diff
+FROM
+(SELECT carrier, month, air_time, AVG(air_time) OVER (PARTITION BY carrier, month) as avg_air_time
+FROM flights) as table_1) as table_2
+GROUP BY carrier, month
+"
+results = dbGetQuery(con, my_query)
+head(results)
+flights = data.frame(nycflights13::flights)
+airlines = data.frame(nycflights13::airlines)
+planes = data.frame(nycflights13::planes)
+planes_tbl = head(planes, 20)
+View(planes_tbl)
+my_query =
+"
+SELECT flights.*, planes.*
+FROM flights
+INNER JOIN planes
+ON flights.tailnum = planes.num
+limit 100
+"
+results = dbGetQuery(con, my_query)
+my_query =
+"
+SELECT flights.*, planes.*
+FROM flights
+INNER JOIN planes
+ON flights.tailnum = planes.tailnum
+limit 100
+"
+results = dbGetQuery(con, my_query)
+head(results)
+my_query =
+"
+SELECT planes.manufacturer, planes.tailnum
+FROM planes
+INNER JOIN flights
+ON planes.tailnum = flights.tailnum
+"
+results = dbGetQuery(con, my_query)
+head(results)
+my_query =
+"
+SELECT flights.month, planes.manufacturer, planes.tailnum
+FROM planes
+WHERE flights in (1, 2)
+INNER JOIN flights
+ON planes.tailnum = flights.tailnum
+"
+results = dbGetQuery(con, my_query)
+head(results)
+my_query =
+"
+SELECT flights.month, planes.manufacturer, planes.tailnum
+FROM planes
+WHERE flights.month in (1, 2)
+INNER JOIN flights
+ON planes.tailnum = flights.tailnum
+"
+results = dbGetQuery(con, my_query)
+head(results)
+my_query =
+"
+SELECT flights.month, planes.manufacturer, planes.tailnum
+FROM planes
+INNER JOIN flights
+ON planes.tailnum = flights.tailnum
+WHERE flights.month in (1, 2)
+"
+results = dbGetQuery(con, my_query)
+head(results)
+my_query =
+"
+SELECT month, manufacturer, COUNT(*) as flight_count
+FROM
+(SELECT flights.tailnum,
+flights.month,
+planes.manufacturer
+FROM flights
+INNER JOIN planes
+ON flights.tailnum = planes.tailnum
+WHERE month in (1, 2)) as flt_cnt
+GROUP BY
+month, manufacturer
+"
+results = dbGetQuery(con, my_query)
+head(results)
+library(blogdown)
+library(kableExtra)
+library(rmarkdown)
+library(png)
+library(raster)
+library(devtools)
+library(dplyr)
+library(VSURF)
+library(quantregForest)
+library(broom)
+library(merTools)
+library(lubridate)
 setwd('/Users/mlebo1/Desktop/Site')
 blogdown::serve_site()
-results$
-servr::daemon_stop("4352931232")
-servr::daemon_stop("4352931232")
+servr::daemon_stop("4779528464")
