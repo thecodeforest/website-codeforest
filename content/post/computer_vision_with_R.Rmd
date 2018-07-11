@@ -3,8 +3,8 @@ title: "Computer Vision with R & Keras"
 author: "Mark LeBoeuf"
 date: '2018-01-10T21:13:14-05:00'
 summary: Keras is quickly becoming the go-to prototyping solution for computer vision
-  problems, and this post provides an overview of how to rapidly build a convolutional
-  neural network in R with the Keras library.
+  problems, and this post provides an overview of how to rapidly build a Convolutional
+  Neural Network in R with the Keras library.
 tags:
 - R
 - Keras
