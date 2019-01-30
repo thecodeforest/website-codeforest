@@ -63,7 +63,8 @@ libs = c('leaflet',
          'dplyr',
          'stringr',
          'glue',
-         'emo'
+         'emo',
+         'rlist'
          )
 lapply(libs, require, character.only = TRUE, quietly = TRUE)
 
@@ -161,7 +162,8 @@ collect_key_from_profile = function(profile_location, prefix){
   profile_lines = sapply(profile_lines, function(x) qdapRegex::ex_between(x,
                                                                           prefix,
                                                                           '"'
-  ))
+                                                                          )
+                        )
   profile_key = unname(Filter(Negate(is.na), profile_lines))[[1]]
   return(profile_key)
 }
@@ -169,10 +171,12 @@ collect_key_from_profile = function(profile_location, prefix){
 
 
 ```{r}
-bash_location = paste0(stringr::str_split(getwd(), '/')[[1]][1:3], collapse = "/")
+bash_location = paste0(stringr::str_split(getwd(), '/')[[1]][1:3], 
+                       collapse = "/")
 bash_prefix = 'export GOOGLEMAPSKEY="'
 gmaps_api_key = collect_key_from_profile(bash_location,
-                                         bash_prefix)
+                                         bash_prefix
+                                         )
 ```
 
 Now that we have our API key and dictionary of best bars, we'll pass these into the `geocode_address` function below. 
@@ -198,7 +202,8 @@ def geocode_address(address_dict, gmaps_key):
 	geocode_address_df.columns = ['lat',
             								   'long',
             								   'address',
-            								   'name']
+            								   'name'
+            								   ]
 	return(geocode_address_df)
 ```
 
@@ -248,7 +253,8 @@ bar_map = leaflet(data = bar_locations) %>%
                            weight = 10,
                            stroke = FALSE,
                            opacity = 4,
-                           fillOpacity = 4)
+                           fillOpacity = 4
+                           )
 ```
 
 ```{r, fig.height=7, fig.width=7.5, message=FALSE, warning=FALSE, echo = FALSE}
@@ -258,7 +264,7 @@ bar_map
 Each bar is represented as an orange dot, and the pointer indicates our starting position (the depot). Given that we are walking, let's limit the potential distance to a maximum of three miles from our starting location. The function below calculates the total feet between two points defined by a latitude/longitude coordinate. 
 
 ```{r}
-earth_dist <- function (lat1, long1, lat2, long2)
+earth_dist = function (lat1, long1, lat2, long2)
 {
   rad = pi/180
   a1 = lat1 * rad
@@ -282,12 +288,13 @@ feet_in_mile = 5280
 max_miles_away = 3
 
 bar_locations_nearby = bar_locations %>% 
-                       mutate(distance_from_depot = earth_dist(depot_lat,
+                       dplyr::mutate(distance_from_depot = earth_dist(depot_lat,
                                                                depot_long,
                                                                lat,
                                                                long
-                                                               )) %>% 
-                       filter(distance_from_depot <= feet_in_mile * max_miles_away)
+                                                               )
+                              ) %>% 
+                       dplyr::filter(distance_from_depot <= feet_in_mile * max_miles_away)
 ```
 
 After applying our distance filter, there is still ~70 bars remaining. That's going to be a challenge to complete in a reasonable amount of time, so we'll further reduce our consideration set down to 24, which means we can spend a little more time at each bar. Below we'll randomly select 24 bars from the 70. 
@@ -300,58 +307,63 @@ n_bars = 24
 
 # randomly select 24 bars to visit
 bar_locations_nearby = bar_locations_nearby %>% 
-                       sample_n(n_bars)
+                       dplyr::sample_n(n_bars)
 ```
 
 Next we'll transform the lat/long locations into a distance matrix. The distance matrix specifies the euclidean distance of each bar from every other bar. 
 ```{r, warning=FALSE, message = FALSE}
 # now find optimal route
 coordinates = bar_locations_nearby %>% 
-              dplyr::select(lat:name
-                            ) %>% 
+              dplyr::select(lat:name) %>% 
               dplyr::mutate(location_index = 2:(n() + 1)) %>% 
               dplyr::bind_rows(data.frame(lat = depot_lat,
                                           long = depot_long,
                                           address = 'depot',
                                           name = 'depot',
                                           location_index = 1
-                                   )) %>% 
+                                          )
+                               ) %>% 
               dplyr::arrange(location_index)
 
 coords_matrix = coordinates %>% 
-                  dplyr::select(lat, long) %>% 
-                  as.matrix()
+                dplyr::select(lat, long) %>% 
+                as.matrix()
 
 dist_matrix = dist(coords_matrix)
 ```
 
 The two functions below `tsp_instance` and `run_solver` will do the heavy lifting and find the optimal route between bars. 
-```{r, echo = FALSE, message = FALSE}
+```{r, warning=FALSE, message = FALSE}
 # create tsp instance
 tsp_ins = tspmeta::tsp_instance(coords_matrix,
                                 dist_matrix)
 
 # find optimal route based on 2-opt method
 opt_tour = as.integer(tspmeta::run_solver(tsp_ins, 
-                                 method="2-opt"))
+                                          method="2-opt")
+                      )
 
 # sort to start at depot
 sorted_tour = c(opt_tour[which(opt_tour == 1):length(opt_tour)],
-         opt_tour[1:(which(opt_tour == 1) - 1)])
+                opt_tour[1:(which(opt_tour == 1) - 1)]
+                )
 
 # join route order back to original data
 coordinates = coordinates %>% 
               dplyr::inner_join(data.frame(location_index = sorted_tour,
-                                           route_order = 1:length(sorted_tour))) %>% 
+                                           route_order = 1:length(sorted_tour)
+                                           )
+                                ) %>% 
               dplyr::arrange(route_order)
 
 # reformat so each row has a starting lat/long and ending lat/long
 route_df = coordinates %>% 
             dplyr::rename(start_lat = lat,
-                   start_long = long 
-            ) %>% 
+                          start_long = long
+                          ) %>% 
             dplyr::mutate(end_lat = c(start_lat[2:n()], NA),
-                          end_long = c(start_long[2:n()], NA)) %>% 
+                          end_long = c(start_long[2:n()], NA)
+                          ) %>% 
             na.omit()
 ```
 
@@ -393,16 +405,21 @@ def find_path(route_df, gmaps_key, travel_mode):
 	out_route_df = pd.DataFrame()
 	for index, row in route_df.iterrows():
 		print("Processing Stop {n} of {n_rows}".format(n = str(index),
-													  n_rows = str(route_df.shape[0])
-														))
+													                         n_rows = str(route_df.shape[0])
+													                         )
+				 )  
 		row_count += 1
 		try:
 			travel_data = gmaps.directions(origin = list(row[['start_lat', 
-	                                                  'start_long']]),
-	                               destination = list(row[['end_lat', 
-	                                                       'end_long']]),
-	                               mode = travel_mode
-	                               )
+	                                                      'start_long'
+	                                                    ]]
+	                                                 ),
+	                                 destination = list(row[['end_lat', 
+	                                                       'end_long'
+	                                                     ]]
+	                                                 ),
+	                                  mode = travel_mode
+	                                  )
 			path_df = extract_polyline(travel_data[0])
 			path_df['location_index'] = row['location_index']
 			path_df['travel_time'] = travel_data[0]['legs'][0]['duration']['value']
@@ -425,7 +442,7 @@ travel_mode = 'walking'
 path_df = calc_route(route_df,
                      gmaps_api_key,
                      travel_mode
-                  )
+                    )
 ```
 
 ```{r, echo = FALSE, message = FALSE}
@@ -449,15 +466,16 @@ Note the small changes between each of the successive lat/long coordinates. This
 
 ```{r, warnings = FALSE}
 travel_time_in_hours = round(path_df %>% 
-                         dplyr::select(location_index, travel_time) %>% 
-                         dplyr::distinct() %>% 
-                         dplyr::pull(travel_time) %>% 
-                         sum() / 3600, 1)
+                             dplyr::select(location_index, travel_time) %>% 
+                             dplyr::distinct() %>% 
+                             dplyr::pull(travel_time) %>% 
+                             sum() / 3600, 1)
 
 print(glue::glue("Total Travel Time Is: ",
                  travel_time_in_hours,
                  " Hours"
-                 ))
+                 )
+      )
 ```
 
 It looks like this walk will take a little over five hours, so we'll need to bring some comfy shoes. What about distance (we'll need some way to work off those calories)? 
@@ -466,10 +484,17 @@ It looks like this walk will take a little over five hours, so we'll need to bri
 travel_distance_in_miles = round(path_df %>% 
   dplyr::mutate(feet_numeric = 
                 case_when(stringr::str_detect(miles, 'ft') == TRUE ~ 
-                as.numeric(stringr::str_replace(miles, " ft", "")),
-                stringr::str_detect(miles, " mi") == TRUE ~ 
-                as.numeric(stringr::str_replace(miles, " mi", "")) * feet_in_mile
-                                        )
+                          as.numeric(stringr::str_replace(miles, 
+                                                          " ft", 
+                                                          ""
+                                                          )
+                                     ),
+                          stringr::str_detect(miles, " mi") == TRUE ~ 
+                          as.numeric(stringr::str_replace(miles, 
+                                                          " mi", 
+                                                          "")
+                                     ) * feet_in_mile
+                         )
                 ) %>% 
   dplyr::select(location_index, feet_numeric) %>% 
   dplyr::distinct() %>% 
@@ -479,7 +504,8 @@ travel_distance_in_miles = round(path_df %>%
 print(glue::glue("Total Travel Distance Is: ",
                  travel_distance_in_miles,
                  " Miles"
-                 ))
+                 )
+      )
 ```
 
 OK, this is more of a Pub Crawl half-marathon. That's some serious distance to cover. Let's bring it all together with some visualization. 
@@ -491,7 +517,7 @@ The last step is to bring this analysis to life with everyone's favorite visuali
 ```{r}
 # We'll use this to identify the labels for each stop 
 label_df = path_df %>% 
-           filter(path_order == 1)
+           dplyr::filter(path_order == 1)
 
 # Bar crawl visualization
 final_route = leaflet(data = path_df) %>%
@@ -503,10 +529,10 @@ final_route = leaflet(data = path_df) %>%
                lat = ~lat,
                color = "orange",
                opacity = 4
-  ) %>% 
+               ) %>% 
   addMarkers(lng = depot_long,
              lat = depot_lat
-  ) %>% 
+             ) %>% 
   addCircleMarkers(data = label_df,
                    lng = ~long,
                    lat = ~lat,
@@ -518,8 +544,8 @@ final_route = leaflet(data = path_df) %>%
                                                textsize = "14px",
                                                offset=c(0,-30),
                                                size = 1
-                   )
-  )
+                                               )
+                  )
 
 ```
 

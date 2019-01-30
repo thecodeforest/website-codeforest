@@ -1,0 +1,663 @@
+---
+title: "College Rankings and Pay"
+author: "Mark LeBoeuf"
+date: '2018-09-11T21:13:14-05:00'
+summary: College rankings are a standard input for most students when choosing a school.
+  But to what extent does a college's rank relate to how much a graduate makes 10
+  years into their career? We'll answer this question by web scraping data from a
+  variety of online sources with R and Python, and then build a model to understand
+  which factors matter most to post-college pay.
+tags:
+- College Rankings
+- Career
+- R
+- Python
+categories:
+- College Rankings
+- Career
+- R
+- Python
+---
+```{r, echo=FALSE, out.height="200px", out.width="800px"}
+knitr::include_graphics("/Users/mlebo1/Desktop/site/content/post/college_rankings_images/belushi.jpg")
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Overview
+
+Rankings are a pervasive part of modern life, especially for big decisions -- like shelling out thousands of dollars for an education. Indeed, college rankings are amongst the most widely cited rankings in existence. Students, parents, and college administrators fret about where their school lands along these highly debated spectrums. But does it really matter in terms of future earnings potential? While an education is more than a simple "means to an end", making a decent living is amongst the reasons why students pull all-nighters, work terrible summer jobs, and do everything they can to position themselves for a lucrative, meaningful career. Accordingly, this post will focus on the following topics: 
+
+`r emo::ji("geek")` The relationship between Mid Career Pay and College Ranking after accounting for external variables (e.g., % of STEM degrees conferred each year)
+
+`r emo::ji("geek")` Understand which variables exhibit the strongest relationship with pay
+
+`r emo::ji("geek")` Identify which college's graduates over/under earn relative to our predictions
+
+Since I'm a big fan of Learning-by-doing, I've included all of the code used to answer these questions. If you are simply interested in the answers, [click here](#analysis)
+
+### Data Collection
+
+We'll leverage the following data sources for our analysis: 
+
+- 2018 Payscale Data of Median Mid Career Earnings By College (with additional data about each college)
+
+- 2017 Forbes Undergraduate College Rankings
+
+- 2018 Cost of Living Index by State
+
+Let's start by collecting the earnings and rankings data. The `reticulate` package allows us to call the two python functions (outlined below) to scrape this data and return it as a DataFrame back into R. For the sake of simplicity, all of the scripts referenced herein exist in the same folder as the .R script. The `pacman` package will do the heavy lifting here, loading all previously installed packages and installing all referenced but uninstalled packages. 
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+my_plot_theme = function(){
+  font_family = "Helvetica"
+  font_face = "bold"
+  return(theme(
+    axis.text.x = element_text(size = 16, face = font_face, family = font_family),
+    axis.text.y = element_text(size = 16, face = font_face, family = font_family),
+    axis.title.x = element_text(size = 16, face = font_face, family = font_family),
+    axis.title.y = element_text(size = 16, face = font_face, family = font_family),
+    strip.text.y = element_text(size = 16, face = font_face, family = font_family),
+    plot.title = element_text(size = 20, face = font_face, family = font_family),
+    plot.caption = element_text(size = 11, face = "italic", hjust = 0),
+    
+    legend.position = "top",
+    legend.text = element_text(size = 20,
+                               face = font_face,
+                               family = font_family),
+    legend.key = element_rect(size = 3),
+    legend.key.size = unit(3, 'lines'),
+    legend.title=element_blank()
+  ))
+}
+```
+
+
+```{r}
+library(pacman)
+pacman::p_load('readr',
+               'reshape',
+               'dplyr',
+               'janitor',
+               'ggplot2',
+               'broom',
+               'rvest',
+               'reticulate',
+               'glue',
+               'caret',
+               'kableExtra',
+               'artyfarty',
+               'patchwork',
+               'sjPlot',
+               'purrr',
+               'stringr',
+               'tibble'
+               )
+# set plotting theme to black & white
+theme_set(theme_bw())
+
+# set plotting colors 
+color_pal = pal("five38")
+
+# set custom plotting theme
+# source('my_plot_theme.R')
+```
+
+We've loaded/installed the relevant packages, set our working directory, and loaded our custom plotting theme (see [here](#appendix) for theme. Next we'll tell R which version of Python to use. 
+
+```{r}
+reticulate::use_python('/anaconda/envs/py36/bin/python', required = TRUE)
+```
+
+Let's source (i.e., bring the Python functions into our R environment) with the following command: 
+
+```{r, eval = FALSE}
+reticulate::source_python('rankings_earnings_post_functions.py')
+```
+
+We now have access to the two functions described below -- `collect_payscale_info` and `college_college_ranks`.Each will scrape data from the web, convert the results into a Pandas DataFrame, and then return the final result back as an R DataFrame. 
+```{python eval = FALSE}
+import pandas as pd
+import urllib3
+from bs4 import BeautifulSoup
+import re
+import ast
+
+HTTP = urllib3.PoolManager()
+#
+# Function to scrape payscale information
+#
+def collect_payscale_info():
+    base_url = 'https://www.payscale.com/college-salary-report/bachelors?page=101'
+    page = HTTP.request('GET', base_url)
+    soup = BeautifulSoup(page.data, 'lxml')
+    all_colleges = (str(soup)
+                    .split("var collegeSalaryReportData = ")[1]
+                    .split('},{')
+                    )
+    college_list = []
+    for i in all_colleges:
+        try:
+            college_list.append(ast.literal_eval("{" + i.replace("[{", "") + "}"))
+        except Exception as e:
+            print(e)
+    college_df = pd.DataFrame(college_list)
+    return(college_df)
+#
+# Function to scrape college rankings information  
+#
+def collect_college_ranks(college_names_list):
+    base_url = 'https://www.forbes.com/colleges/'
+    rank_list = []
+    for college_name in college_names_list:
+        print(str(round(count/float(len(college_names_list)) * 100, 2)) + '% Complete')
+        try:
+            tmp_url = base_url + college_name.lower().replace(" ", "-") + "/"
+            page = HTTP.request('GET', base_url)
+            soup = BeautifulSoup(page.data, 'lxml')
+            college_rank = (re.search(r'class="rankonlist">#(.*?) <a href="/top-colleges/list/"', 
+                                      str(soup))
+                              .group(1)
+                           )
+            rank_list.append([college_name, college_rank])
+        except Exception as e:
+            rank_list.append([college_name, None])
+            print(e)
+        count += 1
+    rank_df = pd.DataFrame(rank_list)
+    rank_df = rank_df.rename(columns={rank_df.columns[0]: "college_name",
+                                      rank_df.columns[1]: "rank"
+                                  })
+    return(rank_df)
+```
+
+Let's start by collecting data about each college. We'll gather the following fields: 
+
+* Percent_Female: Percentage of the student body that is female
+* Percent_Stem: Percentage of students majoring in a Science, Technology, Engineering, or Math field
+* Undergraduate_Enrollment: Number of students enrolled as undergraduate students
+* School_Sector: If the College if Public or Private
+* Rank: 2017 Forbe's undergraduate college rankings
+* COL_Index: Cost of Living index at the state level
+* Mid_Career_Median_Pay: Median Salary for alumni with 10+ years of experience 
+
+```{r eval=FALSE, message=FALSE, warning=FALSE}
+college_salary_df = collect_payscale_info() %>% 
+  clean_names() %>% 
+  select(friendly_name,
+         state,
+         percent_female,
+         percent_stem,
+         undergraduate_enrollment,
+         school_sector,
+         mid_career_median_pay
+         ) %>% 
+  rename(college_name = friendly_name)
+```
+
+```{r message=FALSE, include=FALSE}
+setwd('/Users/mlebo1/Desktop/site/content/post/college_rankings_images/college_rankings_scrape')
+college_salary_df = 
+  read_csv('payscale_college_data.csv') %>% 
+  janitor::clean_names() %>% 
+  dplyr::select(friendly_name,
+                state,
+                percent_female,
+                percent_stem,
+                undergraduate_enrollment,
+                school_sector,
+                mid_career_median_pay
+                ) %>% 
+  dplyr::rename(college_name = friendly_name)
+```
+
+Below we'll have a glimpse at the first few rows of data pertinent to each college. 
+
+```{r, echo = FALSE}
+kable(head(college_salary_df, 20), "html", align = "c") %>%
+  kable_styling(bootstrap_options = c("striped",
+                                      "hover"),
+                full_width = FALSE) %>%
+  scroll_box(width = "720px", height = "300px")
+
+```
+
+Looks good! Next, we'll pass the college names as an argument into our `collect_college_ranks` function. We'll iterate through each college and extract its ranking, which ranges from 1 to 650.
+
+```{r, eval = FALSE}
+college_rankings_df = collect_college_ranks(college_salary_df$college_name) %>% 
+  clean_names() %>% 
+  filter(is.na(rank) == FALSE) %>% 
+  arrange(rank)
+```
+
+```{r, message=FALSE, include=FALSE}
+setwd('/Users/mlebo1/Desktop/site/content/post/college_rankings_images/college_rankings_scrape')
+college_rankings_df = 
+  read_csv('college_ranks.csv') %>% 
+  janitor::clean_names() %>% 
+  dplyr::rename(college_name = friendly_name) %>% 
+  dplyr::filter(is.na(rank) == FALSE) %>% 
+  dplyr::arrange(rank)
+
+print(head(college_rankings_df, 10))
+```
+
+Our last piece of data is the Cost of Living for each college's state of residence. College graduates frequently work in the same state they attend college, and Cost of Living is related to how much companies pay their employees. By accounting for such expenses, we'll have better estimates of the impact of rankings on pay This data is housed on a website that publishes current Cost of Living estimates by state. We'll switch back to R and use the `rvest` package for web scraping. 
+
+```{r}
+table_path = '/html/body/div[5]/div/table'
+url = "https://www.missourieconomy.org/indicators/cost_of_living/"
+
+col_table = url %>% 
+  read_html() %>% 
+  html_nodes(xpath = table_path) %>% 
+  html_table(header = TRUE)
+
+# note: col_index = cost of living index
+col_df = data.frame(col_table[[1]])[,c(1, 3)] %>% 
+  setNames(., c('state', 'col_index')) %>% 
+  slice(2:(n() - 1)) %>% 
+  mutate(col_index = as.numeric(col_index)) %>% 
+  arrange(desc(col_index))
+
+print(head(col_df, 10))
+```
+
+Having lived on the West Coast for the past three years, these numbers check out! The next step is to confirm that we can join our Cost of Living data with college salaries. A simple `left join` will identify any inconsistencies between our key (state) that are we using to merge our datasets. 
+
+```{r message=FALSE, warning=FALSE}
+college_salary_df %>% 
+  select(state) %>% 
+  distinct() %>% 
+  left_join(col_df, by = 'state') %>% 
+  filter(is.na(col_index) == TRUE)
+```
+
+The only mismatch within the United States is the District of Columbia. We'll reformat the state names and then join all three data sources -- salary, rankings, and Cost of Living -- to complete our final data set. 
+
+```{r message=FALSE, warning=FALSE}
+final_df = college_salary_df %>% 
+  inner_join(college_rankings_df, by = 'college_name') %>% 
+  inner_join(col_df %>% 
+             mutate(state = ifelse(state == 'District of    Columbia', 
+                                            'District of Columbia',
+                                             state
+                                   )
+                                  ),
+                    by = 'state'
+                    ) %>% 
+  arrange(rank) %>% 
+  select(-state) %>% 
+  select(rank, everything()) %>% 
+  mutate(percent_stem = as.numeric(percent_stem),
+         percent_female = as.numeric(percent_female),
+         undergraduate_enrollment =  as.numeric(undergraduate_enrollment),
+         school_sector = factor(if_else(school_sector == 'Public', 1, 0))
+                ) %>% 
+  na.omit() %>% 
+  data.frame()
+
+```
+
+```{r, echo = FALSE}
+kable(head(final_df, 100), "html", align = "c") %>%
+  kable_styling(bootstrap_options = c("striped",
+                                      "hover"),
+                full_width = FALSE) %>%
+  scroll_box(width = "720px", height = "300px")
+
+```
+
+We have a total of 578 colleges with complete data. Let's get moving on our analysis! 
+
+### Analysis
+
+We'll first start by examining the relationship between our two main variables of interest: College Rank and Mid Career Pay.  
+
+```{r, fig.width = 10, fig.height = 10, message=FALSE, warning=FALSE, echo=FALSE}
+ggplot(final_df, aes(x = rank, y = mid_career_median_pay)) + 
+  geom_point(size = 2, alpha = 0.5) + 
+  stat_smooth(size = 2, color = 'black') + 
+  ylab("Mid Career Median Pay") + 
+  xlab("College Rank") + 
+  my_plot_theme() + 
+  scale_y_continuous(labels=scales::dollar) + 
+  scale_x_continuous(breaks = seq(0, max(final_df$rank), by = 50))
+```
+
+Earnings drop much quicker for highly ranked colleges relative to lower ranked colleges. Let's break this out by bucketing the ranks and examining the slopes for each bucket -- that is, the expected change in salary as our ranking decreases by one. 
+
+```{r}
+final_df = final_df %>% 
+  mutate(rank_bucket = case_when(rank >= 1 & rank <= 50 ~ '1 - 50',
+                                 rank >= 51 & rank <= 100 ~ '51 - 100',
+                                 rank > 100 & rank <= 200 ~ '101 - 200',
+                                 rank > 200 & rank <= 400 ~ '201 - 400',
+                                 rank > 400 ~ '> 400'
+                                 )
+         )
+
+rank_bucket_est = final_df %>% 
+  group_by(rank_bucket) %>% 
+  do(tidy(lm(mid_career_median_pay ~ rank, data=.))) %>% 
+  select(rank_bucket, term, estimate) %>% 
+  reshape::cast(rank_bucket ~ term, value = 'estimate') %>% 
+  clean_names() %>% 
+  dplyr::rename(rank_coeff = rank) %>% 
+  data.frame() %>% 
+  arrange(rank_coeff)
+
+```
+
+```{r, echo = FALSE}
+kable(rank_bucket_est, "html", align = "c") %>%
+  kable_styling(bootstrap_options = c("striped",
+                                      "hover"),
+                full_width = FALSE) %>%
+  scroll_box(width = "720px", height = "220px")
+
+```
+
+While the relationship between earnings and rank is non-linear, this provides a rough estimate of what we originally noticed in the first scatterplot. Specifically, for colleges that fall in the 1- 50 bucket, a one-unit reduction in rank is associated with a decrease in pay of ~$600. In contrast, for those in the > 400 bucket, a one-unit reduction results only in a ~$36 reduction in pay. Let's bring this concept to life by visualizing the relationship with our grouped ranking variable. 
+
+```{r fig.width = 10, fig.height = 10}
+rank_bucket_est %>% 
+  inner_join(final_df, by = 'rank_bucket') %>% 
+  mutate(predicted_income = rank * rank_coeff + intercept) %>% 
+  mutate(rank_bucket = factor(rank_bucket,
+                              levels = c('1 - 50',
+                                         '51 - 100',
+                                         '101 - 200',
+                                         '201 - 400',
+                                         '> 400'
+                                         )
+                              )
+         ) %>% 
+  ggplot(aes(x = rank, y = predicted_income, color = rank_bucket)) + 
+    geom_point() + 
+    geom_line() + 
+    geom_point(data = final_df, aes(x = rank,
+                                    y = mid_career_median_pay),
+               alpha = 0.25
+               ) + 
+    my_plot_theme() + 
+    ylab("Predicted Mid Career Pay") + 
+    scale_y_continuous(labels=scales::dollar) + 
+    scale_x_continuous(breaks = seq(0, max(final_df$rank), by = 50)) + 
+    labs(color = 'Rank Bucket') + 
+    scale_color_manual(values = pal("five38"))
+```
+
+At this point, we've established that (1) rank is a good predictor of earnings, and (2) the nature of this relationship varies by the level of the rank, indicating that a modeling approach that handles non-linearity would likely perform better than our current linear model. Accordingly, we'll try out three separate models -- Linear Regression, General Additive Model, and Random Forest -- to see which performs best on a holdout set. Once we identify the best approach (from a modeling perspective), we'll start considering the role of the other variables as well.  
+
+```{r}
+row.names(final_df) = final_df$college_name
+final_df = final_df %>%
+  select(-rank_bucket, -college_name)
+
+y_var = 'mid_career_median_pay'
+x_var = setdiff(names(final_df), y_var)
+model_form = as.formula(paste0(y_var,
+                               " ~ ",
+                               paste0(x_var, collapse = " + ")
+                               )
+                        )
+print(model_form)
+```
+
+Now that we've established our model formula, let's do a quick quality check on our data. We'll first consider the presence of variables with near zero variance. Such variables all have the same value (e.g., 0) or are highly unbalanced (e.g., 10000 zeros and 1 one). This can be problematic for certain modeling approaches, in that 
+the model won't fit properly. Second, we'll explore the bi-variate correlations amongst our predictors. Highly correlated variables can interfere with interpretability and lead to incorrect parameter estimates. If you've ever done a linear regression and the direction or size of the resulting coefficients don't make sense, this might be the reason. We'll check for both of these issues below. 
+
+```{r}
+# identifies any variables with near zero variance, which can lead to model instability
+near_zero_vars = nearZeroVar(final_df[x_var])
+# identifies any vavriables with absolute correlation > .7
+correlated_vars = findCorrelation(cor(final_df[x_var[x_var != 'school_sector']]),
+                                  cutoff = .7
+                                  )
+
+print(c(paste0("N correlated Vars: ", length(correlated_vars)),
+        paste0("N low variance Vars: ", length(near_zero_vars))
+        )
+      )
+```
+Looks good. Let's compare our three models and select the one that provides the best out-of-sample performance using the `caret` package. We'll use 10-fold cross validation and repeat the validation process five times. 
+
+```{r message=FALSE, warning=FALSE}
+control = trainControl(method = 'repeatedcv',
+                      number = 10,
+                      repeats = 5
+                      )
+
+set.seed(1)
+model_lm = train(model_form, 
+                 data=final_df, 
+                 method="lm", 
+                 trControl=control
+                 )
+
+set.seed(1)
+model_gam = train(model_form, 
+                  data=final_df, 
+                  method="gam", 
+                  trControl=control
+                  )
+set.seed(1)
+model_rf = train(model_form, 
+                 data=final_df, 
+                 method="rf", 
+                 trControl=control,
+                 ntree = 100
+                 )
+```
+
+Model performance is based on Root Mean Square Error (RMSE), R-squared, and Mean Absolute Error (MAE). While performance across these metrics will be related, each tells a different story. For example, RMSE squares each of the errors before they are averaged, while MAE simply takes the absolute value. RMSE puts a larger penalty on models with big errors relative to MAE. Thus, if reliability and consistency are particularly important, RMSE might be the better metric. In the current context, we aren't concerned with this tradeoff -- and obviously it's easiest when all metrics point to the same model! 
+
+```{r message=FALSE, warning=FALSE}
+model_perf = resamples(list(LM=model_lm, 
+                            GAM=model_gam, 
+                            RF=model_rf)
+                       )$values %>% 
+  clean_names() %>% 
+  select(-resample) %>% 
+  reshape::melt() %>% 
+  as_tibble()
+
+model_perf$model_metric = model_perf$variable %>%
+  map(function(x) str_split(pattern = "_", x))
+
+model_perf$model = model_perf$model_metric %>%
+  map(function(x) x[[1]][1]) %>%
+  unlist()
+
+model_perf$metric =
+  model_perf$model_metric %>%
+  map(function(x) x[[1]][2]) %>%
+  unlist()
+
+model_perf = model_perf %>%
+  select(-variable, -model_metric)
+```
+
+Let's visualize the performance of each model across 50 trials (10 folds X 5 repeats) with a boxplot.
+
+```{r, fig.width = 10, fig.height = 10}
+ggplot(model_perf, aes(x = model, y = value, color = model)) + 
+  geom_boxplot() + 
+  facet_grid(metric ~ ., scales = 'free') + 
+  my_plot_theme() + 
+  scale_color_manual(values = color_pal) + 
+  ylab("Metric Value") + 
+  xlab("Model")
+```
+
+The GAM performed best, following by the Random Forest and Linear Regression Model. Let's do a quick review of each by considering the in-sample errors -- that is, when we make predictions against the same dataset we trained our model on. A simple approach is to plot the fitted (predicted) values against the errors (residuals).
+```{r}
+insample_predictions = final_df %>% 
+  mutate(lm_pred = as.vector(predict(model_lm, final_df)),
+         gam_pred = as.vector(predict(model_gam, final_df)),
+         rf_pred = as.vector(predict(model_rf, final_df))
+         ) %>% 
+  select(y_var, ends_with('_pred')) %>% 
+  reshape::melt(y_var) %>% 
+  dplyr::rename(predicted_earnings = value,
+                actual_earnings = mid_career_median_pay,
+                model = variable
+                ) %>% 
+  mutate(residual = actual_earnings - predicted_earnings) 
+
+```
+
+
+```{r message=FALSE, warning=FALSE, fig.width = 10, fig.height = 10}
+ggplot(insample_predictions, 
+       aes(x = predicted_earnings,
+           y = residual,
+           color = model
+           )) + 
+  geom_point(alpha = 0.5, size = 2) + 
+  facet_grid(model ~ .) + 
+  geom_abline(intercept = 0, slope = 0) + 
+  stat_smooth(size = 2, se = FALSE) + 
+  scale_color_manual(values = pal("five38")[c(1, 3, 2)]) + 
+  my_plot_theme() + 
+  xlab("Predicted Earnings") + 
+  ylab("Residual")
+```
+
+A few takeaways from this visual. First, it's apparent that a non-linear model (e.g., GAM or RF) performs best on this dataset, based on the pattern of residuals associated with the linear model. Second, the GAM performed best in terms of limiting bias across the entire prediction range. This means we are just as likely to over- or under-predict across the range of values, whereas RF and LM are biased at the tails of the range. Third, RF performs much better in-sample than out-of-sample, as is indicated by the close spread of the errors around zero. This indicates that the RF model is likely overfitting, which we could address by (1) acquiring more data, and/or (2) changing some of the model parameters to encourage a simpler, more robust model -- a process referred to as *regularization*. However, interpretability is a key component of our analysis, and GAM models have this quality in spades. Let's move forward with the GAM and rank the overall importance of each variable. 
+
+```{r}
+var_imp = varImp(model_gam)$importance %>% 
+  dplyr::rename(importance = Overall) %>% 
+  rownames_to_column(var = 'variable')
+```
+
+```{r, fig.width = 10, fig.height = 10}
+  ggplot(var_imp, aes(x = reorder(variable, importance), y = importance)) + 
+  geom_bar(stat = 'identity', 
+           fill =  pal("five38")[1],
+           color = 'black') + 
+  coord_flip() + 
+  my_plot_theme() + 
+  xlab("") + 
+  ylab("Importance")
+```
+
+This provides a global measure of importance for all of our variables. Let's take this a step further and examine the marginal effects of the top four most important variables. 
+
+```{r message=FALSE, warning=FALSE}
+x_var_plot = x_var[!x_var %in% c('undergraduate_enrollment', 'school_sector')]
+marginal_effects_plots = list()
+for(var in x_var_plot){
+  tmp_effects_plot = plot_model(model_gam$finalModel, 
+                                 type = "pred", 
+                                 terms = var
+                                )
+  tmp_effects_plot = tmp_effects_plot + 
+    ggtitle(glue::glue("Predicted Pay by {var}")) + 
+    xlab(glue::glue("{var}")) + 
+    ylab("Mid Career Median Pay") + 
+    theme_bw() + 
+    my_plot_theme() + 
+    scale_y_continuous(labels=scales::dollar)
+  
+  marginal_effects_plots[[var]] = tmp_effects_plot
+}
+```
+
+Below we'll take our four separate plots and organize them nicely into a single, unified plot via the `patchwork` package. 
+```{r fig.width = 12, fig.height = 10}
+(marginal_effects_plots$rank + 
+  marginal_effects_plots$percent_female + 
+  marginal_effects_plots$percent_stem +
+  marginal_effects_plots$col_index + 
+  patchwork::plot_layout(ncol = 2) 
+)
+```
+
+Most of these findings aren't too surprising: Those who attend top-ranked colleges, in a state with a high cost of living, and likely majored in a STEM subject tend to have the highest pay. However, pay as a percentage of female graduates was unexpected. While the earnings discrepency between men and women has been well documented, it was surprising to see that the gender distribution of a college was a stronger predictor of earnings than cost of living or major. While I'd put less faith in the predictions at the extreme ranges (i.e., all-male or all-female colleges), it is unfortunate to see such a discrepancy.
+
+### Over and Under Performers
+
+The last question to consider is which college's graduates over/under perform their expected pay. Looking at where your model goes wrong is a great way to identify missing variables. Let's have a look at the top and bottom 10 colleges based on the largest positive and negative residual values.
+
+```{r}
+final_df$college_name = row.names(final_df)
+final_df$predicted_pay = as.vector(predict(model_gam, final_df))
+final_df$residual_pay = final_df$mid_career_median_pay - final_df$predicted_pay  
+top10_over_under = bind_rows(
+  final_df %>% 
+  arrange(desc(residual_pay)) %>% 
+  head(10) %>% 
+  mutate(earnings_group = 'More Than Expected'),
+  final_df %>% 
+  arrange(residual_pay) %>% 
+  head(10) %>% 
+  mutate(earnings_group = 'Less Than Expected')
+                            )
+```
+
+```{r, fig.width = 10, fig.height = 10}
+ggplot(top10_over_under, 
+       aes(x = reorder(college_name, residual_pay),
+           y = residual_pay,
+           fill = earnings_group
+           )
+       ) + 
+    geom_bar(stat = 'identity', color = 'black') + 
+    coord_flip() + 
+    my_plot_theme() + 
+    ylab("Error") +
+    xlab("") + 
+    scale_fill_manual(values = color_pal) + 
+    theme(legend.title=element_blank(),
+          legend.text = element_text(size = 15)
+          )
+    
+```
+
+It is interesting to note that Babson and SUNY Maritime are the top two over-performers, meaning that their graduates have higher pay than expected. A quick google search reveals what these two colleges have in common: They both emphasize specialization in lucrative fields. Babson focuses exclusively on entrepreneurship and business, while SUNY Maritime prepares graduates for what I believe to be lucrative careers around boats?
+
+![](https://media.giphy.com/media/l2Jeczy9FOg59bKYE/giphy.gif)
+
+
+In contrast, the only pattern that emerges amongst the under-performers is that most are small, private, liberal arts colleges. While our model accounted for school sector (private vs. public) and undergraduate enrollment, it is possible that including a factor indicating if a college emphasizes a liberal arts education could be valuable. Indeed, the vocational emphasis of the two top over-performers suggests that our model would likely improve with the addition of a feature that captures if a college has a Liberal Arts vs. Vocational focus.   
+
+### Conclusion: Does Rank Matter? 
+
+It's important to note that our outcome variable -- *Median* Mid Career Pay -- is a summary statistic. Thus, we do not know how much information each college contributed to our estimates, as the raw data (i.e., the individual responses associated with each college) are not available. However, these findings seem directionally correct. Even after considering the aforementioned caveat, it is apparent that where you attend college is strongly associated with how much you earn later in life. This is especially true for top ranked colleges. The difference between attending a college ranked in the top 10 relative to the top 100 has substantial pay implications, while this difference is less important amongst lower ranked colleges. 
+
+Hopefully you enjoyed the post. I'd love to hear your feedback, so feel free to comment below!
+
+### Appendix
+
+```{r message=FALSE, warning=FALSE, eval = FALSE}
+my_plot_theme = function(){
+  font_family = "Helvetica"
+  font_face = "bold"
+  return(theme(
+    axis.text.x = element_text(size = 16, face = font_face, family = font_family),
+    axis.text.y = element_text(size = 16, face = font_face, family = font_family),
+    axis.title.x = element_text(size = 16, face = font_face, family = font_family),
+    axis.title.y = element_text(size = 16, face = font_face, family = font_family),
+    strip.text.y = element_text(size = 16, face = font_face, family = font_family),
+    plot.title = element_text(size = 20, face = font_face, family = font_family),
+    plot.caption = element_text(size = 11, face = "italic", hjust = 0),
+    
+    legend.position = "top",
+    legend.title = element_text(size = 16,
+                                face = font_face,
+                                family = font_family),
+    legend.text = element_text(size = 20,
+                               face = font_face,
+                               family = font_family),
+    legend.key = element_rect(size = 3),
+    legend.key.size = unit(3, 'lines'),
+    legend.title=element_blank()
+  ))
+}
+```
