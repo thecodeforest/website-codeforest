@@ -1,512 +1,512 @@
-warnings()
-model_rf =
-caret::train(model_form,
-data=final_df,
-method="rf",
-trControl=control,
-ntree = 75,
-mtry = c(2,3,4)
-)
-head(final_df)
-caret::nearZeroVar(final_df[, -y_var])
-y_var
-caret::nearZeroVar(final_df[x_var])
-caret::nearZeroVar(final_df[,x_var])
-caret::nearZeroVar(final_df[c('percent_female', 'percent_stem')])
-caret::nearZeroVar(final_df[x_var])
-near_zero_vars = caret::nearZeroVar(final_df[x_var], saveMetrics = TRUE)
-near_zero_vars
-cor(final_df[x_var])
-head(x_var)
-cor(final_df[x_var[x_var != 'school_sector']])
-findCorrelation(cor(final_df[x_var[x_var != 'school_sector']]),
-cutoff = .7
-)
-print(near_zero_vars)
-# identifies any variables with near zero variance, which can lead to model instability
-near_zero_vars = caret::nearZeroVar(final_df[x_var], saveMetrics = TRUE)
-# identifies any vavriables with absolute correlation > .7
-correlated_vars = findCorrelation(cor(final_df[x_var[x_var != 'school_sector']]),
-cutoff = .7
-)
-print(near_zero_vars)
-# identifies any variables with near zero variance, which can lead to model instability
-near_zero_vars = caret::nearZeroVar(final_df[x_var], saveMetrics = TRUE)
-# identifies any vavriables with absolute correlation > .7
-correlated_vars = caret::findCorrelation(cor(final_df[x_var[x_var != 'school_sector']]),
-cutoff = .7
-)
-correlated_vars
-print(paste0("N correlated Vars: ", length(correlated_vars),
-"N low variance Vars: ", length(near_zero_vars)
-)
-)
-head(final_df)
-caret::nearZeroVar(final_df[x_var])
-length(caret::nearZeroVar(final_df[x_var]))
-# identifies any variables with near zero variance, which can lead to model instability
-near_zero_vars = caret::nearZeroVar(final_df[x_var], saveMetrics = TRUE)
-# identifies any vavriables with absolute correlation > .7
-correlated_vars = caret::findCorrelation(cor(final_df[x_var[x_var != 'school_sector']]),
-cutoff = .7
-)
-print(paste0("N correlated Vars: ", length(correlated_vars),
-"N low variance Vars: ", length(near_zero_vars)
-)
-)
-# identifies any variables with near zero variance, which can lead to model instability
-near_zero_vars = caret::nearZeroVar(final_df[x_var])
-# identifies any vavriables with absolute correlation > .7
-correlated_vars = caret::findCorrelation(cor(final_df[x_var[x_var != 'school_sector']]),
-cutoff = .7
-)
-print(paste0("N correlated Vars: ", length(correlated_vars),
-"N low variance Vars: ", length(near_zero_vars)
-)
-)
-print(paste0("N correlated Vars: ", length(correlated_vars), "\n",
-"N low variance Vars: ", length(near_zero_vars)
-)
-)
-print(c(paste0("N correlated Vars: ", length(correlated_vars)),
-paste0("N low variance Vars: ", length(near_zero_vars))
-)
-)
-print(strwrap(c(paste0("N correlated Vars: ", length(correlated_vars)),
-paste0("N low variance Vars: ", length(near_zero_vars))
-)
-))
-print(strwrap(c(paste0("N correlated Vars: ", length(correlated_vars)),
-paste0("N low variance Vars: ", length(near_zero_vars))
-),
-collapse="\n"
-))
-c(paste0("N correlated Vars: ", length(correlated_vars)),
-paste0("N low variance Vars: ", length(near_zero_vars)))
-c(paste0("N correlated Vars: ", length(correlated_vars)),
-paste0("N low variance Vars: ", length(near_zero_vars)))
-length(c(paste0("N correlated Vars: ", length(correlated_vars)),
-paste0("N low variance Vars: ", length(near_zero_vars))))
-strwrap(c(paste0("N correlated Vars: ", length(correlated_vars)),
-paste0("N low variance Vars: ", length(near_zero_vars))))
-print(strwrap(c(paste0("N correlated Vars: ", length(correlated_vars)),
-paste0("N low variance Vars: ", length(near_zero_vars)))))
-print(c(paste0("N correlated Vars: ", length(correlated_vars)),
-" | ",
-paste0("N low variance Vars: ", length(near_zero_vars))
-)
-)
-print(c(paste0("N correlated Vars: ", length(correlated_vars)),
-paste0("N low variance Vars: ", length(near_zero_vars))
-)
-)
-# identifies any variables with near zero variance, which can lead to model instability
-near_zero_vars = caret::nearZeroVar(final_df[x_var])
-# identifies any vavriables with absolute correlation > .7
-correlated_vars = caret::findCorrelation(cor(final_df[x_var[x_var != 'school_sector']]),
-cutoff = .7
-)
-print(c(paste0("N correlated Vars: ", length(correlated_vars)),
-paste0("N low variance Vars: ", length(near_zero_vars))
-)
-)
-ggplot(insample_predictions, aes(x = predicted_earnings,
-y = residual,
-color = model
-)) +
-geom_point(alpha = 0.5) +
-facet_grid(model ~ .) +
-geom_abline(intercept = 0, slope = 0) +
-stat_smooth(size = 2, se = FALSE) +
-scale_color_manual(values = pal("five38")[c(1, 3, 2)]) +
+rename(value = y) %>%
+bind_rows(fcast_1 %>%
+mutate(ds = ymd(ds),
+actual = fcast_results$valid[[1]]$y
+) %>%
+select(ds, yhat, actual) %>%
+rename(predicted = yhat) %>%
+gather(key, value, -ds)) %>%
+ggplot(aes(ds, value, color = key)) +
+geom_point() +
 my_plot_theme() +
-xlab("Predicted Earnings") +
-ylab("Residual")
-# HISTORICAL DEMAND FOR PRODUCTS ------------------------------------------
-a = '90008 90009 90016 90024 90025 90034 90043 90045 90049 90056 90064 90066 90067 90069 90073 90077 90080 90083 90094 90095 90230 90231 90232 90233 90272 90291 90292 90293 90294 90295 90296 90301 90302 90303 90304 90305 90306 90307 90308 90309 90311 90312 90401 90402 90403 90404 90405 90406 90407 90408 90409 90410 90411 90002 90003 90037 90044 90047 90059 90061 90062 90082 90221 90222 90224 90245 90250 90251 90262 90310 90706 90707 90723 90805 90220 90223 90247 90248 90249 90254 90260 90261 90266 90267 90274 90275 90277 90278 90501 90502 90503 90504 90505 90506 90507 90508 90509 90510 90710 90711 90712 90713 90714 90715 90716 90717 90720 90721 90731 90732 90733 90734 90740 90744 90745 90746 90747 90748 90749 90755 90801 90802 90803 90804 90806 90807 90808 90809 90810 90813 90814 90815 90822 90831 90832 90833 90834 90835 90842 90844 90846 90847 90848 90853 90895 90899 91706 91722 91723 91724 91731 91732 91733 91734 91735 91745 91746 91748 91754 91755 91756 91765 91770 91771 91772 91788 91789 91790 91791 91792 91793 91795 91803 90004 90005 90006 90007 90010 90011 90012 90013 90014 90015 90017 90018 90019 90020 90021 90026 90027 90028 90029 90030 90035 90036 90038 90046 90048 90051 90053 90054 90055 90057 90060 90068 90070 90071 90072 90074 90075 90076 90078 90079 90081 90084 90086 90087 90088 90089 90093 90096 90099 90189 90209 90210 90211 90212 90213 91714 91715 91716 91744 91747 91749 90050 91001 91003 91006 91007 91008 91009 91010 91011 91016 91017 91023 91024 91025 91031 91066 91077 91101 91102 91103 91104 91105 91106 91107 91108 91109 91110 91114 91115 91116 91117 91118 91121 91123 91124 91125 91126 91129 91182 91184 91185 91188 91189 91199 91702 91740 91741 91775 91776 91778 91780 91801 91802 91804 91896 91899 90001 90022 90040 90052 90058 90091 90101 90103 90201 90202 90239 90240 90241 90242 90255 90270 90280 90601 90602 90603 90604 90605 90606 90607 90608 90609 90610 90637 90638 90639 90640 90650 90651 90652 90660 90661 90662 90670 90671 90701 90702 90703 90023 90031 90032 90033 90039 90041 90042 90063 90065 91012 91020 91021 91030 91046 91201 91202 91203 91204 91205 91206 91207 91208 91209 91210 91221 91222 91225 91226 92602 92603 92604 92606 92607 92609 92612 92616 92617 92618 92619 92620 92625 92650 92652 92654 92657 92674 92678 92690 92693 92697 92698 92782 90742 90743 92605 92614 92615 92623 92626 92627 92628 92646 92647 92648 92649 92655 92658 92659 92660 92661 92662 92663 92683 92684 92685 92701 92702 92703 92704 92705 92707 92708 92711 92712 92725 92728 92735 92780 92781 92799 92840 92842 92843 92844 90633 92706 92806 92807 92808 92809 92811 92816 92817 92821 92822 92823 92856 92857 92859 92861 92862 92863 92864 92865 92866 92867 92868 92869 92870 92871 92885 92886 92887 92899 90620 90621 90622 90623 90624 90630 90631 90632 90680 92801 92802 92803 92804 92805 92812 92814 92815 92825 92831 92832 92833 92834 92835 92836 92837 92838 92841 92845 92846 92850 92610 92624 92629 92630 92637 92651 92653 92656 92672 92673 92675 92676 92677 92679 92688 92691 92692 92694 90840'
-gsub(" ", ", ", a)
-gsub("'", ", ", a)
-gsub("\\'", ", ", a)
-strsplit(a, " ")
-help(sapply)
-sapply(strsplit(a, " "), function(x) paste0("'", x, "',"))
-apply(strsplit(a, " "), function(x) paste0("'", x, "',"))
-sapply(strsplit(a, " "), function(x) paste0("'", x, "',"))
-sapply(strsplit(a, " "), function(x) paste0("'", x, "',"), simplify = TRUE)
-as.vector(strsplit(a, " "), function(x) paste0("'", x, "',"))
-b = strsplit(a, " "), function(x) paste0("'", x, "',")
-b = sapply(strsplit(a, " "), function(x) paste0("'", x, "',"))
-b
-b[1]
-b[,1]
-as.vector(b[,1])
-# HISTORICAL DEMAND FOR PRODUCTS ------------------------------------------
-df1 = read_csv('/Users/mlebo1/Desktop/begin_new/darkstore_experimentation/input_data/product_demand_before_after_ds.csv')
-hefad(df1)
-head(df1)
-df1 = df1 %>%
-mutate(shipping_method = case_when(shipping_method == 'Two Day Air Upgrade'  ~ 'Standard Shipping',
-shipping_method == 'Ground Service' ~ 'Standard Shipping',
-TRUE ~ shipping_method
-))
-# HISTORICAL DEMAND FOR PRODUCTS ------------------------------------------
-library(dplyr)
-library(dplyr)
-df1 = read_csv('/Users/mlebo1/Desktop/begin_new/darkstore_experimentation/input_data/product_demand_before_after_ds.csv')
-df1 = df1 %>%
-mutate(shipping_method = case_when(shipping_method == 'Two Day Air Upgrade'  ~ 'Standard Shipping',
-shipping_method == 'Ground Service' ~ 'Standard Shipping',
-TRUE ~ shipping_method
-))
-head(df1)
-head(df1)
-test = df1 %>% filter(style_color_cd == '315122-111')
-test
-test = df1 %>% filter(style_color_cd == '315122-111' & shipping_method == 'Next Day Air')
-test
-test = df1 %>% filter(style_color_cd == '315122-111' & shipping_method == 'Next Day Air' & city == 'LA')
-test
-test = df1 %>%
-filter(style_color_cd == '315122-111' & shipping_method == 'Next Day Air' & city == 'LA') %>%
-arrange(order_dt)
-test
-test = df1 %>%
-filter(style_color_cd == '315122-111' & shipping_method == 'Next Day Air' & city == 'LA') %>%
-arrange(desc(order_dt))
-test
-ggplot(test, aes(x = order_dt, y = qty)) +
-geom_point() + geom_line()
-test = df1 %>%
-filter(shipping_method == 'Next Day Air' & city == 'LA') %>%
-arrange(desc(order_dt))
-test
-View(test)
-# SET PYTHON ENVIRONMENT
-reticulate::use_python('/anaconda/envs/py36/bin/python', required = TRUE)
-reticulate::source_python('/Users/mlebo1/Desktop/begin_new/cal_abv/abv_calorie_collect.py')
-reticulate::source_python('/Users/mlebo1/Desktop/begin_new/cal_abv/abv_calorie_collect.py')
-df = main()
-reticulate::source_python('/Users/mlebo1/Desktop/begin_new/cal_abv/abv_calorie_collect.py')
-df = main()
-head(df)
-ggplot(df, aes(x = calories, y = abv)) +
-geom_point()
-ggplot(df, aes(x = abv, y = calories)) +
-geom_point()
-# SET PYTHON ENVIRONMENT
-reticulate::use_python('/anaconda/envs/py36/bin/python', required = TRUE)
-reticulate::source_python('/Users/mlebo1/Desktop/begin_new/cal_abv/abv_calorie_collect.py')
-df = main()
-ggplot(df, aes(x = abv, y = calories)) +
-geom_point()
-ggplot(df, aes(x = abv, y = calories)) +
-geom_point() +
-theme_bw()
-df1 = df %>%
-filter(abv < 11) %>%
-filter(calories < 350)
-ggplot(df1, aes(x = abv, y = calories)) +
-geom_point() +
-theme_bw()
-# SET PYTHON ENVIRONMENT
-library(dplyr)
-df1 = df %>%
-filter(abv < 11) %>%
-filter(calories < 350)
-ggplot(df1, aes(x = abv, y = calories)) +
-geom_point() +
-theme_bw()
-geom_point() +
-theme_bw()
-ggplot(df1, aes(x = abv/100, y = calories)) +
-geom_point() +
-theme_bw()
-lm_pred = lm(calories ~ abv, data = df1)
-lm_pred
-lm_pred$fitted.values
-unname(lm_pred$fitted.values)
-df1$lm_pred = unname(lm(calories ~ abv, data = df1)$fitted.values)
-df1$heuristic_pred = df1$abv * 30
-df1
-View(df1)
-# SET PYTHON ENVIRONMENT
-library(dplyr)
-reticulate::use_python('/anaconda/envs/py36/bin/python', required = TRUE)
-reticulate::source_python('/Users/mlebo1/Desktop/begin_new/cal_abv/abv_calorie_collect.py')
-df = main()
-head(df)
-df1 = df %>%
-filter(abv < 11) %>%
-filter(calories < 350) %>%
-distinct()
-df1$lm_pred = unname(lm(calories ~ abv, data = df1)$fitted.values)
-df1$heuristic_pred = df1$abv * 30
-head(df1)
-df1 = df1 %>%
-mutate(lm_residual = calories - lm_pred,
-heuristic_residual = calories - heuristic_pred
+labs(x = 'Date (day)',
+y = 'Units',
+color = 'Part'
 )
-df1
-help(melt)
-help(reshape::melt)
-df1 %>%
-select(calories, lm_pred, heuristic_pred) %>%
-reshape::melt()
-df1 %>%
-select(calories, lm_pred, heuristic_pred) %>%
-reshape::melt(id = 'calories')
-df1 %>%
-select(calories, lm_residual, heuristic_residual) %>%
-reshape::melt(id = 'calories')
-df1 %>%
-select(calories, lm_residual, heuristic_residual) %>%
-reshape::melt(id = 'calories') %>%
-ggplot(aes(x = calories, y = value)) +
-facet_grid(variable ~ .)
-df1 %>%
-select(calories, lm_residual, heuristic_residual) %>%
-reshape::melt(id = 'calories') %>%
-ggplot(aes(x = calories, y = value)) +
-geom_point()
-facet_grid(variable ~ .)
-df1 %>%
-select(calories, lm_residual, heuristic_residual) %>%
-reshape::melt(id = 'calories') %>%
-ggplot(aes(x = calories, y = value)) +
-geom_point()+
-facet_grid(variable ~ .)
-df1 %>%
-select(calories, lm_residual, heuristic_residual) %>%
-reshape::melt(id = 'calories') %>%
-ggplot(aes(x = calories, y = value)) +
-geom_point()+
-facet_grid(variable ~ .) +
-theme_bw()
-df1 %>%
-select(calories, lm_residual, heuristic_residual) %>%
-reshape::melt(id = 'calories') %>%
-ggplot(aes(x = calories, y = value)) +
-geom_point()+
-facet_grid(variable ~ .) +
-theme_bw() +
-stat_smooth(method = 'lm')
-df1 %>%
-select(calories, lm_residual, heuristic_residual) %>%
-reshape::melt(id = 'calories') %>%
-ggplot(aes(x = calories, y = value, color = variable)) +
-geom_point()+
-#facet_grid(variable ~ .) +
-theme_bw() +
-stat_smooth(method = 'lm')
-# SET PYTHON ENVIRONMENT
-library(dplyr)
-reticulate::use_python('/anaconda/envs/py36/bin/python', required = TRUE)
-reticulate::source_python('/Users/mlebo1/Desktop/begin_new/cal_abv/abv_calorie_collect.py')
-df = main()
-df1 = df %>%
-filter(abv < 11) %>%
-filter(calories < 350) %>%
-distinct()
-df1$lm_pred = unname(lm(calories ~ abv, data = df1)$fitted.values)
-df1$heuristic_pred = df1$abv * 30
-df1 = df1 %>%
-mutate(lm_residual = calories - lm_pred,
-heuristic_residual = calories - heuristic_pred
+fcast_results$train[[1]] %>%
+mutate(key = 'train') %>%
+rename(value = y) %>%
+bind_rows(fcast_1 %>%
+mutate(ds = ymd(ds),
+actual = fcast_results$valid[[1]]$y
+) %>%
+select(ds, yhat, actual) %>%
+rename(predicted = yhat) %>%
+gather(key, value, -ds)) %>%
+mutate(key = str_to_title(key)) %>%
+ggplot(aes(ds, value, color = key)) +
+geom_point() +
+my_plot_theme() +
+labs(x = 'Date (day)',
+y = 'Units',
+color = 'Part'
 )
-help(reshape::melt)
-head(df1)
-nrow(df1)
-df1$lm_pred = unname(lm(calories ~ abv, data = df1)$fitted.values)
-df1$heuristic_pred = df1$abv * 30
-df1 = df1 %>%
-mutate(lm_residual = calories - lm_pred,
-heuristic_residual = calories - heuristic_pred
+fcast_results$train[[1]] %>%
+mutate(key = 'train') %>%
+rename(value = y) %>%
+bind_rows(fcast_1 %>%
+mutate(ds = ymd(ds),
+actual = fcast_results$valid[[1]]$y
+) %>%
+select(ds, yhat, actual) %>%
+rename(predicted = yhat) %>%
+gather(key, value, -ds)) %>%
+mutate(key = str_to_title(key)) %>%
+ggplot(aes(ds, value, color = key)) +
+geom_point() +
+my_plot_theme() +
+labs(x = 'Date (day)',
+y = 'Units',
+color = 'Part'
+) +
+stat_smooth()
+fcast_results$train[[1]] %>%
+mutate(key = 'train') %>%
+rename(value = y) %>%
+bind_rows(fcast_1 %>%
+mutate(ds = ymd(ds),
+actual = fcast_results$valid[[1]]$y
+) %>%
+select(ds, yhat, actual) %>%
+rename(predicted = yhat) %>%
+gather(key, value, -ds)) %>%
+mutate(key = str_to_title(key)) %>%
+ggplot(aes(ds, value, color = key)) +
+geom_point() +
+my_plot_theme() +
+labs(x = 'Date (day)',
+y = 'Units',
+color = 'Part'
 )
-heaD(df1)
-head(df1)
-sd(df1$heuristic_residual)
-sd(df1$heuristic_residual) * 2
-head(df1)
-ggplot(df1, aes(x = abv, y = calories)) +
-geom_point()
-ggplot(df1, aes(x = abv, y = calories)) +
+library(ggforce)
+result_plot <- fcast_results$train[[1]] %>%
+mutate(key = 'train') %>%
+rename(value = y) %>%
+bind_rows(fcast_1 %>%
+mutate(ds = ymd(ds),
+actual = fcast_results$valid[[1]]$y
+) %>%
+select(ds, yhat, actual) %>%
+rename(predicted = yhat) %>%
+gather(key, value, -ds)) %>%
+mutate(key = str_to_title(key))
+result_plot
+tail(result_plot$ds, 90)
+result_plot %>%
+ggplot(aes(ds, value, color = key)) +
 geom_point() +
-theme_bw()
-ggplot(df1, aes(x = abv, y = calories)) +
-geom_point() +
-theme_bw() +
-stat_smooth(method = 'lm', formula = y ~ x * 30)
-ggplot(df1, aes(x = abv, y = calories)) +
-geom_point() +
-theme_bw() +
-stat_smooth(method = 'lm', formula = abv ~ x * 30)
-ggplot(df1, aes(x = abv, y = calories)) +
-geom_point() +
-theme_bw() +
-stat_smooth(method = 'lm', formula = y ~ x)
-ggplot(df1, aes(x = abv, y = calories)) +
-geom_point() +
-theme_bw() +
-stat_smooth(method = 'lm', formula = y ~ x - 3)
-ggplot(df1, aes(x = abv, y = calories)) +
-geom_point() +
-theme_bw() +
-stat_smooth(method = 'lm', formula = y ~ x)
-ggplot(df1, aes(x = abv, y = calories)) +
-geom_point() +
-theme_bw() +
-geom_line(data = df1, aes(x = abv, y = heuristic_pred))
-ggplot(df1, aes(x = abv, y = calories)) +
-geom_point() +
-theme_bw() +
-geom_line(data = df1, aes(x = abv, y = heuristic_pred), color = 'blue')
-ggplot(df1, aes(x = abv, y = calories)) +
+my_plot_theme() +
+facet_zoom(x = ds %in% tail(result_plot$ds, 90)) +
+labs(x = 'Date (day)',
+y = 'Units',
+color = 'Part'
+)
+result_plot %>%
+ggplot(aes(ds, value, color = key)) +
+geom_point(size = 2) +
+my_plot_theme() +
+facet_zoom(x = ds %in% tail(result_plot$ds, 90)) +
+labs(x = 'Date (day)',
+y = 'Units',
+color = 'Part'
+)
+result_plot %>%
+ggplot(aes(ds, value, color = key)) +
+geom_point(size = 2) +
+geom_line(alpha = 0.2) +
+my_plot_theme() +
+facet_zoom(x = ds %in% tail(result_plot$ds, 90)) +
+labs(x = 'Date (day)',
+y = 'Units',
+color = 'Part'
+)
+result_plot %>%
+ggplot(aes(ds, value, color = key)) +
+geom_point(size = 2) +
+geom_line(alpha = 0.3) +
+my_plot_theme() +
+facet_zoom(x = ds %in% tail(result_plot$ds, 90)) +
+labs(x = 'Date (day)',
+y = 'Units',
+color = 'Part'
+)
+result_plot <- fcast_results$train[[1]] %>%
+mutate(key = 'Historical') %>%
+rename(value = y) %>%
+bind_rows(fcast_1 %>%
+mutate(ds = ymd(ds),
+actual = fcast_results$valid[[1]]$y
+) %>%
+select(ds, yhat, actual) %>%
+rename(predicted = yhat) %>%
+gather(key, value, -ds)) %>%
+mutate(key = str_to_title(key))
+result_plot %>%
+ggplot(aes(ds, value, color = key)) +
+geom_point(size = 2) +
+geom_line(alpha = 0.3) +
+my_plot_theme() +
+facet_zoom(x = ds %in% tail(result_plot$ds, 90)) +
+labs(x = 'Date (day)',
+y = 'Units',
+color = 'Part'
+)
+knitr::include_graphics("/Users/mlebo1/Desktop/begin_new/crossvalidation_timeseries/post_plot.png")
+result_plot %>%
+ggplot(aes(ds, value, color = key)) +
+geom_point(size = 2) +
+geom_line(alpha = 0.3) +
+my_plot_theme() +
+facet_zoom(x = ds %in% tail(result_plot$ds, 90)) +
+labs(x = 'Date (day)',
+y = 'Units',
+color = 'Part'
+)
+result_plot <- fcast_results$train[[1]] %>%
+mutate(key = 'train') %>%
+rename(value = y) %>%
+bind_rows(fcast_1 %>%
+mutate(ds = ymd(ds),
+actual = fcast_results$valid[[1]]$y
+) %>%
+select(ds, yhat, actual) %>%
+rename(predicted = yhat) %>%
+gather(key, value, -ds)) %>%
+mutate(key = str_to_title(key))
+result_plot %>%
+ggplot(aes(ds, value, color = key)) +
+geom_point(size = 2) +
+geom_line(alpha = 0.3) +
+my_plot_theme() +
+facet_zoom(x = ds %in% tail(result_plot$ds, 90)) +
+labs(x = 'Date (day)',
+y = 'Units',
+color = 'Part'
+)
+fcast_results$valid[[1]]
+slice01_validation <-
+fcast_results$valid[[1]] %>%
+mutate(ds = ymd(ds),
+actual = fcast_results$valid[[1]]$y
+)
+slice01_validation
+fcast_results
+fcast_results$pred_prophet
+fcast_results$pred_prophet[[1]]
+fcast_results$pred_prophet[[1]] %>%
+transmute(ds = ymd(ds),
+predicted = yhat,
+actual = fcast_results$valid[[1]]$y
+)
+fcast_results$pred_prophet[[1]] %>%
+transmute(ds = ymd(ds),
+predicted = yhat,
+actual = fcast_results$valid[[1]]$y
+) %>%
+gather(key, value, -ds)
+slice01_training <-
+fcast_results$train[[1]] %>%
+mutate(key = 'Training') %>%
+rename(value = y)
+slice01_validation <-
+fcast_results$pred_prophet[[1]] %>%
+transmute(ds = ymd(ds),
+predicted = yhat,
+actual = fcast_results$valid[[1]]$y
+) %>%
+gather(key, value, -ds) %>%
+mutate(key = str_to_title(key))
+bind_rows(slice01_training,
+slice01_validation
+) %>%
+ggplot(aes(ds, value, color = key)) +
+geom_point(size = 2) +
+geom_line(alpha = 0.3) +
+my_plot_theme() +
+facet_zoom(x = ds %in% tail(result_plot$ds, 90)) +
+labs(x = 'Date (Day)',
+y = 'Units',
+color = 'Part'
+)
+styler:::style_selection()
+styler:::style_selection()
+cv_slice = 1
+slice01_training <-
+fcast_results$train[[cv_slice]] %>%
+mutate(key = "Training") %>%
+rename(value = y)
+slice01_validation <-
+fcast_results$pred_prophet[[cv_slice]] %>%
+transmute(
+ds = ymd(ds),
+predicted = yhat,
+actual = fcast_results$valid[[cv_slice]]$y
+) %>%
+gather(key, value, -ds) %>%
+mutate(key = str_to_title(key))
+bind_rows(
+slice01_training,
+slice01_validation
+) %>%
+ggplot(aes(ds, value, color = key)) +
+geom_point(size = 2) +
+geom_line(alpha = 0.3) +
+my_plot_theme() +
+facet_zoom(x = ds %in% tail(slice01_validation$ds, 90)) +
+labs(
+x = "Date (Day)",
+y = "Units",
+color = "Part"
+)
+cv_slice = 1
+slice01_training <-
+fcast_results$train[[cv_slice]] %>%
+mutate(key = "Training") %>%
+rename(value = y)
+slice01_validation <-
+fcast_results$pred_prophet[[cv_slice]] %>%
+transmute(
+ds = ymd(ds),
+predicted = yhat,
+actual = fcast_results$valid[[cv_slice]]$y
+) %>%
+gather(key, value, -ds) %>%
+mutate(key = str_to_title(key))
+bind_rows(
+slice01_training,
+slice01_validation
+) %>%
+ggplot(aes(ds, value, color = key)) +
+geom_point(size = 2) +
+geom_line(alpha = 0.3) +
+my_plot_theme() +
+facet_zoom(x = ds %in% tail(slice01_validation$ds, 90)) +
+labs(
+x = "Date (Day)",
+y = "Units",
+color = "Part"
+)
+bind_rows(
+slice01_training,
+slice01_validation
+) %>%
+ggplot(aes(ds, value, color = key)) +
+geom_point(size = 2) +
+geom_line(alpha = 0.3) +
+my_plot_theme() +
+facet_zoom(x = ds %in% tail(result_plot$ds, 90)) +
+labs(
+x = "Date (Day)",
+y = "Units",
+color = "Part"
+)
+setwd('/Users/mlebo1/Desktop/site')
+blogdown::serve_site()
+bind_rows(
+slice_training,
+slice_validation
+) %>%
+ggplot(aes(ds, value, color = key)) +
+geom_point(size = 2) +
+geom_line(alpha = 0.3) +
+my_plot_theme() +
+facet_zoom(x = ds %in% tail(slice_validation$ds, 90)) +
+labs(
+x = "Date (Day)",
+y = "Units",
+color = "Part"
+)
+# Core package
+library(tidyverse)
+library(rlang)
+library(janitor)
+# Date manipulation
+library(lubridate)
+# Bootstrapping and time series cross validation
+library(rsample)
+# Forecasting
+library(forecast)
+library(prophet)
+library(tidyquant)
+library(timetk)
+library(sweep)
+# Holiday dates
+library(timeDate)
+# Parallel computation
+library(furrr)
+# Calculating standard error
+library(plotrix)
+# Table formatting for Markdown
+library(kableExtra)
+# Visualization of seperate time series components
+library(ggforce)
+# Global plot theme
+theme_set(theme_bw())
+# Code Forest repo
+repo <- 'https://raw.githubusercontent.com/thecodeforest/time-series-cv-post/master/'
+# Helper functions for manipulating forecasting results
+source(file.path(repo, '/helper-functions/tsCVHelpers.R'))
+# Helper function for visualization
+source(file.path(repo, '/helper-functions/vizTheme.R'))
+# Monthly sales data
+sales_df <- read_csv(file.path(repo, 'data/beverage_sales.csv'))
+store_sales <- read_csv(file.path(repo, "data/store_sales.csv"))
+kable(store_sales %>% head(10), "html", align = "c") %>%
+kable_styling(bootstrap_options = c("striped",
+"hover"),
+full_width = TRUE) %>%
+scroll_box(width = "720px", height = "160px")
+# Set seed for reproducibility
+set.seed(2018)
+# Sample 100 days to serve as 'promotional events'
+promos <- sample(unique(store_sales$date), size = 100)
+# Extract dates of major US holidays
+holidays <- holidayNYSE(year = c(year(min(store_sales$date)):year(max(store_sales$date)))) %>%
+ymd()
+# Add 'sales' to simulate effect of promotion on demand
+# Rename date and sales fields to be compatible with Prophet API
+sales_xreg <- store_sales %>%
+mutate(
+sales = as.numeric(sales),
+sales = case_when(
+date %in% promos ~ sales + rnorm(1, 45, 5),
+date %in% holidays ~ sales + rnorm(1, 25, 5),
+TRUE ~ sales
+),
+sales = round(sales)
+) %>%
+rename(
+ds = date,
+y = sales
+)
+# Field names must match below for Prophet API
+xreg_df <- tibble(
+ds = c(promos, holidays),
+holiday = c(
+rep("Promo", length(promos)),
+rep("USHoliday", length(holidays))
+)
+)
+left_join(sales_xreg, xreg_df) %>%
+replace_na(list(holiday =  "no event")) %>%
+ggplot(aes(ds, y, color = holiday, group = 1)) +
 geom_point(alpha = 0.5) +
-theme_bw() +
-geom_line(data = df1, aes(x = abv, y = heuristic_pred), color = 'blue', size = 3)
-ggplot(df1, aes(x = abv, y = calories)) +
-geom_point(alpha = 0.5, size = 2) +
-theme_bw() +
-geom_line(data = df1, aes(x = abv, y = heuristic_pred), color = 'blue', size = 3)
-ggplot(df1, aes(x = abv, y = calories)) +
-geom_point(alpha = 0.5, size = 2) +
-theme_bw() +
-geom_line(data = df1, aes(x = abv, y = heuristic_pred), color = 'blue', size = 3) +
-stat_smooth(method = 'lm', formula = y ~ x)
-ggplot(df1, aes(x = abv, y = calories)) +
-geom_point(alpha = 0.5, size = 2) +
-theme_bw() +
-geom_line(data = df1, aes(x = abv, y = heuristic_pred), color = 'blue', size = 3) +
-stat_smooth(method = 'lm', formula = y ~ x, color = 'red')
-ggplot(df1, aes(x = abv, y = calories)) +
-geom_point(alpha = 0.5, size = 2) +
-theme_bw() +
-geom_line(data = df1, aes(x = abv, y = heuristic_pred), color = 'blue', size = 3) +
-stat_smooth(method = 'lm', formula = y ~ x, color = 'red', size = 2)
-ggplot(df1, aes(x = abv, y = calories)) +
-geom_point(alpha = 0.5, size = 2) +
-theme_bw() +
-geom_line(data = df1, aes(x = abv, y = heuristic_pred), color = 'blue', size = 3)#+
-library(tidytext)
-library(dplyr)
-library(data.table)
-library(stringr)
-library(SnowballC)
-library(tidytext)
-library(dplyr)
-library(data.table)
-library(stringr)
-library(SnowballC)
-data_dir = '/Users/mlebo1/Desktop/begin_new/beer_advocate'
-fname = 'ipa_beers_small.csv'
-df = read_csv(file.path(data_dir, fname)) %>%
-data.frame()
-ggplot(df, aes(x = overall)) +
-geom_bar()
-beer_stop_words = c('beer', 'ipa', 'taste',
-'tastes', 'ipas', 'brew', 'drink',
-'bit', 'oz', 'glass', 'im',
-'ale', 'pale', 'favorite',
-'unpleasant', 'sam', 'adams', 'lager', 'rated',
-'decent', 'market', 'bought', 'delicious',
-'didnt', 'isnt', 'wasnt', 'disappointed','average',
-'id', 'brewery', 'founders', 'sculpin', 'review',
-'recommend'
+labs(x = 'Date (Day)',
+y = 'Units Sold'
+) +
+my_plot_theme()
+train_valid <- rolling_origin(
+sales_xreg,
+initial = floor(4.5 * 365), # 4.5 years of training
+assess = 90, # assess based on 90-day ahead forecasts
+cumulative = TRUE # continue to build training set across time
+) %>%
+mutate(
+train = map(splits, training), # split training
+valid = map(splits, testing) # split validation
 )
-df1 = df %>%
-mutate(review_id = 1:n()) %>%
-select(review_id, overall, review_text) %>%
-unnest_tokens(word, review_text) %>%
-mutate(word = str_replace_all(word, '[[:punct:]]', '')) %>%
-mutate(word = str_replace_all(word, '[[:digit:]]+', '')) %>%
-filter(word != '') %>%
-anti_join(stop_words) %>%
-left_join(get_sentiments("afinn")) %>%
-mutate(score = ifelse(is.na(score), 0, score)) %>%
-filter(abs(score) < 2) %>%
-filter(! word %in% beer_stop_words) %>%
-select(-score) %>%
-mutate(word = case_when(str_detect(word, '^hop') ~ 'hops',
-str_detect(word, '^bitter') ~ 'bitter',
-str_detect(word, 'feel') ~ 'mouthfeel',
-str_detect(word, '^pour') ~ 'pour',
-str_detect(word, '^balance') ~ 'balanced',
-TRUE ~ word
+print(train_valid)
+# Replicate and 'nest' each resulting copy of xreg_df
+split_ids <- map_dfr(1:nrow(train_valid), function(x) xreg_df) %>%
+mutate(id = rep(train_valid$id, each = nrow(xreg_df))) %>%
+group_by(id) %>%
+nest() %>%
+rename(xreg = data)
+# Join by the id column
+train_valid_xreg <- inner_join(train_valid, split_ids)
+print(train_valid_xreg)
+fcast_results <-
+train_valid_xreg %>%
+mutate(prophet_fit = map2(
+train,
+xreg,
+function(x, y)
+prophet(
+df = x,
+holidays = y,
+growth = "linear",
+yearly.seasonality = "auto",
+weekly.seasonality = "auto"
 )
+),
+pred_prophet = map2(prophet_fit, valid, predict)
 )
-head(df1)
-# filter out rare words
-threshold = 10
-word_cnt = df1 %>%
-group_by(word) %>%
-summarise(cnt = n()) %>%
-data.frame() %>%
-arrange(desc(cnt)) %>%
-filter(cnt <= threshold) %>%
-select(word)
-df1 = df1 %>%
-anti_join(word_cnt)
-df1_wide = df1 %>%
-dcast(formula = review_id + overall ~ word)
-df1_wide[,3:dim(df1_wide)[2]] = apply(df1_wide[,3:dim(df1_wide)[2]],
-2,
-function(x) ifelse(x > 0, 1, 0)
+bind_rows(
+slice_training,
+slice_validation
+) %>%
+ggplot(aes(ds, value, color = key)) +
+geom_point(size = 2) +
+geom_line(alpha = 0.3) +
+my_plot_theme() +
+facet_zoom(x = ds %in% tail(slice_validation$ds, 90)) +
+labs(
+x = "Date (Day)",
+y = "Units",
+color = "Part"
 )
-y_var = 'overall'
-id_vars = 'review_id'
-x_var = setdiff(names(df1_wide),
-c(y_var, id_vars)
+cv_slice = 1
+slice_training <-
+fcast_results$train[[cv_slice]] %>%
+mutate(key = "Training") %>%
+rename(value = y)
+slice_validation <-
+fcast_results$pred_prophet[[cv_slice]] %>%
+transmute(
+ds = ymd(ds),
+predicted = yhat,
+actual = fcast_results$valid[[cv_slice]]$y
+) %>%
+gather(key, value, -ds) %>%
+mutate(key = str_to_title(key))
+bind_rows(
+slice_training,
+slice_validation
+) %>%
+ggplot(aes(ds, value, color = key)) +
+geom_point(size = 2) +
+geom_line(alpha = 0.3) +
+my_plot_theme() +
+facet_zoom(x = ds %in% tail(slice_validation$ds, 90)) +
+labs(
+x = "Date (Day)",
+y = "Units",
+color = "Part"
 )
-library(h2o)
-h2o.init()
-h2o_rf  = h2o.randomForest(x_var,
-y_var,
-training_frame = as.h2o(df1_wide)
-)
-var_imp = data.frame(h2o_rf@model$variable_importances)
-summary(h2o_rf)
-pred_value = as.vector(predict( h2o_rf, as.h2o(df1_wide)))
-df1_wide$pred_val = as.vector(pred_value)
-perf_df = df1_wide %>%
-dplyr::select(overall, pred_val) %>%
-#mutate(difference = overall - pred_)
-cor.test(perf_df$overall,
-perf_df$pred_val
-)
-ggplot(perf_df, aes(x = overall, y = pred_val)) +
-geom_point() +
-stat_smooth(method = 'lm')
-perf_df = df1_wide %>%
-dplyr::select(overall, pred_val)
-cor.test(perf_df$overall,
-perf_df$pred_val
-)
-ggplot(perf_df, aes(x = overall, y = pred_val)) +
-geom_point() +
-stat_smooth(method = 'lm')
-summary(h2o_rf)
-View(var_imp)
-install.packages('tagger')
-pacman::p_load_gh(c(
-"trinker/termco",
-"trinker/coreNLPsetup",
-"trinker/tagger"
-))
-library(reticulate)
-reticulate::use_python('/anaconda/envs/py36/bin/python', required = TRUE)
-reticulate::source_python('collect_ipa_reviews.py')
-data_dir = '/Users/mlebo1/Desktop/begin_new/beer_advocate'
-setwd(data_dir)
-reticulate::source_python('collect_ipa_reviews.py')
-my_df = main()
-my_df
-View(my_df)
+results_tidy <- fcast_results %>%
+select(id, pred_prophet) %>%
+unnest() %>%
+mutate(ds = ymd(ds)) %>%
+inner_join(sales_xreg) %>%
+select(id, ds, yhat, y) %>%
+mutate(error = y - yhat) %>%
+group_by(id) %>%
+mutate(index = row_number()) %>%
+ungroup()
+results_tidy %>%
+group_by(index) %>%
+summarise(q50 = median(error),
+q05 = quantile(error, .05),
+q95 = quantile(error, .95)
+)  %>%
+ggplot(aes(index, q50)) +
+geom_point(size = 2, color = 'red') +
+geom_errorbar(aes(ymin = q05, ymax = q95), alpha  = 0.5) +
+labs(x = 'Forecasting Horizon (Days)',
+y = 'Error (Bars represent 5th/95th percentiles)'
+) +
+my_plot_theme() +
+scale_y_continuous(breaks = seq(-10, 10, by = 2.5))
+blogdown::serve_site()
+blogdown::stop_server()
+setwd('/Users/mlebo1/Desktop/site')
+blogdown::serve_site()
+blogdown::serve_site()
+setwd('/Users/mlebo1/Desktop/site')
+blogdown::serve_site()
+traceback()
+install.packages('blogdown')
+install.packages("blogdown")
 library(blogdown)
-getwd()
-blogdown::serve_site('/Users/mlebo1/Desktop/site')
-blogdown::serve_site('/Users/mlebo1/Desktop/site/')
-setwd('/Users/mlebo1/Desktop/site/')
+setwd('/Users/mlebo1/Desktop/site')
 blogdown::serve_site()
-servr::daemon_stop("5129597800"
-servr::daemon_stop("5129597800")
-blogdown::serve_site()
+# train_transaction %>% glimpse()
+# train_identity = fread(file.path(data_dir, 'train_identity.csv'),
+#                         data.table = FALSE
+#                         ) %>%
+#      clean_names()
+#
+# head(train_transaction)
+# head(train_identity)
+# Explore -----------------------------------------------------------------
+servr::daemon_stop(1)
