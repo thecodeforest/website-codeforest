@@ -8,11 +8,13 @@ tags:
 - Tidyverse
 - Time Series
 - Forecasting
+- Machine Learning
 categories:
 - R
 - Tidyverse
 - Time Series
 - Forecasting
+- Machine Learning
 ---
 
 ```{r, echo=FALSE, out.height="200px", out.width="800px"}
@@ -24,7 +26,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ### A Simple Forecasting Scenario
-Imagine the following scenario: You've been asked to generate a 12-month ahead forecast to facilitate the planning of resources  (e.g., labor, production capacity, marketing budget, etc.) based on the total number of units your company sells each month. The current forecasting process leverages a basic moving average to anticipate monthly sales. You believe there is more signal in the historical sales patterns that the current approach is not using and would like to prove out a new approach. You're also interested in quantifying the lift or value-add of overhauling the existing forecasting process. Accordingly, before implementing an improved version of the existing process, you must first address the following: 
+Imagine the following scenario: You've been asked to generate a 12-month forecast to facilitate the planning of resources  (e.g., labor, production capacity, marketing budget, etc.) based on the total number of units your company sells each month. The current forecasting process leverages a basic moving average to anticipate monthly sales. You believe there is more signal in the historical sales patterns that the current approach is not using and would like to prove out a new approach. You're also interested in quantifying the lift or value-add of overhauling the existing forecasting process. Accordingly, before implementing an improved version of the existing process, you must first address the following: 
 
 1. Identify the method (or methods) that achieve the best forecasting performance.
 
